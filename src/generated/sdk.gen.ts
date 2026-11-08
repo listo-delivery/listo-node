@@ -655,6 +655,17 @@ export const getEvent = <ThrowOnError extends boolean = false>(options: Options<
  * what a `full` store's plan includes, charged to you with that store's
  * plan. Negative.
  *
+ * Three more are a store's add-ons, paid from your balance:
+ *
+ * - `add_on_charge` is one month of the Food rating add-on (`ratings`),
+ * IVA included. Negative, and tied to the
+ * store. A month paid by card writes no row, because it never touched
+ * the balance.
+ * - `customer_whatsapp_use` is the WhatsApp updates add-on's charge for
+ * one delivered trip. Negative, and tied to the order it belongs to.
+ * - `card_payments_use` is the card payments add-on's charge for one
+ * paid card payment. Negative, and tied to the order it belongs to.
+ *
  * `store_id` names the store a movement belongs to, on every row: the
  * store of the order, or the store whose plan was paid. It is `null` when
  * a movement belongs to no single store, such as a top-up or a withdrawal.
@@ -1001,6 +1012,27 @@ export const getStore = <ThrowOnError extends boolean = false>(options: Options<
  * A `street` that moves the store to another country is refused with
  * `422 unsupported_country`, exactly as on the create, and the store keeps
  * the address it had.
+ *
+ * `add_ons` switches the store's paid add-ons on and off. On Listo's
+ * self-serve pricing, the stores your account created itself can hold
+ * add-ons; any other store answers `422 add_ons_unavailable`. Send only the keys you are changing; a key you
+ * leave out is untouched. Switching a pay-per-use add-on on or off
+ * (`customer_whatsapp`, `card_payments`) is free and immediate, and it is
+ * charged afterwards, per use. Switching the monthly add-on `ratings` on
+ * charges its first month now, from your balance, or from your saved card
+ * if you chose card, and the add-on is on only once that month is paid. If
+ * it cannot be paid the request is refused with `402
+ * insufficient_balance`, nothing is charged, the add-on stays off and none
+ * of the other fields in the same request is saved. Switching a monthly
+ * add-on off keeps it
+ * running until the end of the month already paid. A card payment the bank
+ * has not answered yet answers `409 charge_in_flight`; repeat the request
+ * shortly. `wallet` and `full_console` cannot be switched on: they read
+ * `available: false`, and asking to switch either on is refused with `422
+ * validation_failed` and `param: "add_ons.wallet"` or
+ * `"add_ons.full_console"`, before anything is changed or charged.
+ * Switching them off is accepted. See
+ * [Store add-ons](https://docs.listo.delivery/en/guides/store-add-ons).
  *
  */
 export const updateStore = <ThrowOnError extends boolean = false>(options: Options<UpdateStoreData, ThrowOnError>): RequestResult<UpdateStoreResponses, UpdateStoreErrors, ThrowOnError> => (options.client ?? client).patch<UpdateStoreResponses, UpdateStoreErrors, ThrowOnError>({

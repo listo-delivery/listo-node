@@ -912,7 +912,9 @@ export type Store = {
     /**
      * How much of Listo the store itself uses. An `api_only` store's
      * deliveries spend your balance, and a `wallet` or `full` store's
-     * spend its own; `billing` says which. Writable on create and update,
+     * spend its own; `billing` says which. Writable on create and update
+     * (on a store your account creates, `wallet` and `full` are not chosen
+     * here),
      * and always `api_only` on a test store. A live store of an account
      * whose restaurants pay their own Plan Listo cannot be `api_only`: it
      * has no console to buy a plan from, so a create or an update that
@@ -1053,6 +1055,93 @@ export type Store = {
          */
         courtesy: boolean;
     } | null;
+    /**
+     * The store's paid add-ons, or `null` when the store cannot hold any.
+     * On Listo's self-serve pricing, the stores your account created itself
+     * can hold add-ons; any other store shows `add_ons: null`.
+     * When it is an object it has all five keys, each with every field.
+     * Switch them on and off with `PATCH /v1/stores/{id}`. `wallet` and
+     * `full_console` read `available: false` and cannot be switched on. See
+     * [Store add-ons](https://docs.listo.delivery/en/guides/store-add-ons).
+     *
+     */
+    add_ons: {
+        customer_whatsapp: StoreAddOn;
+        ratings: StoreAddOn;
+        card_payments: StoreAddOn;
+        wallet: StoreAddOn;
+        full_console: StoreAddOn;
+    } | null;
+};
+
+/**
+ * One paid add-on of a store and where it stands. `customer_whatsapp`
+ * sends the customer WhatsApp updates on each delivered trip, `ratings`
+ * lets customers rate the delivery, `card_payments` lets the store take
+ * card payments, `wallet` gives the store its own balance, and
+ * `full_console` gives the store its own console and its Plan Listo.
+ *
+ */
+export type StoreAddOn = {
+    /**
+     * `off` is not switched on. `on` is switched on. `ending` is a monthly
+     * add-on you switched off that keeps running until `ends_on`, the end
+     * of the month already paid (`ends_on` is null only while a payment
+     * for the next month is still being confirmed). `scheduled` is a monthly add-on that
+     * starts when a month already running ends (`wallet` switched on
+     * while `full_console` is running out). `past_due` is `full_console`
+     * only: its renewal was refused and it is being retried, and the store
+     * is still served meanwhile.
+     *
+     */
+    status: 'off' | 'on' | 'ending' | 'scheduled' | 'past_due';
+    /**
+     * What the add-on costs, in cents before IVA: per month for a
+     * `monthly` add-on and per use for the other two. While it is off this
+     * is today's price; once it is on it is the price it was switched on at.
+     *
+     */
+    price_cents: number;
+    /**
+     * How it is charged. `per_delivered_trip` is once for each trip that
+     * is delivered, `per_paid_payment` once for each card payment that is
+     * paid, and `monthly` is a month up front, charged when you switch it
+     * on and again on `renews_on`.
+     *
+     */
+    charged: 'per_delivered_trip' | 'monthly' | 'per_paid_payment';
+    /**
+     * The day a monthly add-on is charged next. Null unless the add-on is
+     * `on` and monthly, and also null while its renewal payment is being
+     * confirmed: a payment for its next month has been started and the new
+     * date is not known until that payment resolves (it then renews a
+     * month later if it was paid, or the add-on ends if it was not). On the
+     * renewal day itself, before any payment has been started, it is that
+     * day.
+     *
+     */
+    renews_on: string | null;
+    /**
+     * The last day an `ending` add-on runs. Null in every other status.
+     * For an `ending` add-on it is null ONLY while a payment is still
+     * being confirmed: its month was due to renew when you switched it
+     * off, a payment for the next month was started, and the end date is
+     * not known until that payment resolves (it then ends at the end of
+     * that month if it was paid, or at once if it was not). With no
+     * payment pending it is always the last day of the month already
+     * paid, including the hours after that day has passed and before the
+     * add-on is ended.
+     *
+     */
+    ends_on: string | null;
+    /**
+     * Whether this add-on can be switched on for the store. `false` for
+     * `wallet` and `full_console` on every store: they cannot be switched
+     * on, and asking to is refused with `422 validation_failed`. `true`
+     * for the other three.
+     *
+     */
+    available: boolean;
 };
 
 /**
@@ -1840,7 +1929,11 @@ export type CreateStoreRequest = {
      */
     default_business_fee_share?: number;
     /**
-     * What the store gets besides the API.
+     * What the store gets besides the API. On a store your account
+     * creates, `wallet` and `full` are not chosen here, so a create that
+     * asks for either tier is refused with `422 validation_failed` and
+     * `param: "access_tier"`. `api_only` is always accepted.
+     *
      */
     access_tier?: 'api_only' | 'wallet' | 'full';
     /**
@@ -1888,12 +1981,37 @@ export type UpdateStoreRequest = {
      */
     timezone?: string;
     default_business_fee_share?: number;
+    /**
+     * What the store gets besides the API. On a store your account
+     * created, `wallet` and `full` are not chosen here, so a request that
+     * asks for either tier is refused with `422 validation_failed` and
+     * `param: "access_tier"`. `api_only` is always accepted.
+     *
+     */
     access_tier?: 'api_only' | 'wallet' | 'full';
     markup_cents?: number;
     /**
      * Your own reference for this location. Null clears it.
      */
     external_id?: string | null;
+    /**
+     * Add-ons to switch on (`true`) or off (`false`). Send only the ones
+     * you are changing: a key you leave out is untouched, and this never
+     * replaces the set. `wallet` and `full_console` cannot be switched
+     * on: `true` for either is refused with `422 validation_failed` and
+     * `param: "add_ons.wallet"` or `"add_ons.full_console"`, and `false`
+     * is accepted. Each value must be a JSON boolean; the string
+     * `"true"`, `1` and `null` are refused with `422 validation_failed`
+     * and `param: "add_ons.<key>"`, and so is a key that is not an add-on.
+     *
+     */
+    add_ons?: {
+        customer_whatsapp?: boolean;
+        ratings?: boolean;
+        card_payments?: boolean;
+        wallet?: boolean;
+        full_console?: boolean;
+    };
 };
 
 /**
@@ -2340,7 +2458,7 @@ export type CreateDeliveryErrors = {
      */
     404: ErrorResponse;
     /**
-     * The request conflicts with the state of the world. The object is no longer in a state that allows this (`not_cancellable`, `not_reschedulable`, `not_retriable`, `not_editable`, `not_refundable`, `not_reactivatable`, `plan_ended`), the cancellation did not go through (`cancel_failed`), the plan's charge is still with the bank (`charge_in_progress`), the idempotency key was reused with a different body (`idempotency_conflict`, which no retry fixes), the idempotency key is still held by the request that first sent it (`idempotency_conflict`, and once that request has answered the same call with the same key replays its answer), there is no webhook URL configured for the key's mode so there is nowhere to send (`webhook_endpoint_not_configured`), the event is a courier position, which is never sent again (`event_not_resendable`), the email already has a Listo account (`account_exists`), the store's pickup point is still being moved (`pickup_point_pending`), or no courier is free for this trip right now (`no_couriers_available`). Worth repeating unchanged after a few minutes: `cancel_failed`, `charge_in_progress`, `pickup_point_pending`, `no_couriers_available`, and a call refused because its idempotency key is still held (repeat it with the same key). Every other refusal here needs the request or the object to change first.
+     * The request conflicts with the state of the world. The object is no longer in a state that allows this (`not_cancellable`, `not_reschedulable`, `not_retriable`, `not_editable`, `not_refundable`, `not_reactivatable`, `plan_ended`), the cancellation did not go through (`cancel_failed`), the plan's charge is still with the bank (`charge_in_progress`), an add-on's first payment is still with the bank (`charge_in_flight`), the idempotency key was reused with a different body (`idempotency_conflict`, which no retry fixes), the idempotency key is still held by the request that first sent it (`idempotency_conflict`, and once that request has answered the same call with the same key replays its answer), there is no webhook URL configured for the key's mode so there is nowhere to send (`webhook_endpoint_not_configured`), the event is a courier position, which is never sent again (`event_not_resendable`), the email already has a Listo account (`account_exists`), the store's pickup point is still being moved (`pickup_point_pending`), or no courier is free for this trip right now (`no_couriers_available`). Worth repeating unchanged after a few minutes: `cancel_failed`, `charge_in_progress`, `charge_in_flight`, `pickup_point_pending`, `no_couriers_available`, and a call refused because its idempotency key is still held (repeat it with the same key). Every other refusal here needs the request or the object to change first.
      */
     409: ErrorResponse;
     /**
@@ -2383,7 +2501,7 @@ export type CancelDeliveryErrors = {
      */
     404: ErrorResponse;
     /**
-     * The request conflicts with the state of the world. The object is no longer in a state that allows this (`not_cancellable`, `not_reschedulable`, `not_retriable`, `not_editable`, `not_refundable`, `not_reactivatable`, `plan_ended`), the cancellation did not go through (`cancel_failed`), the plan's charge is still with the bank (`charge_in_progress`), the idempotency key was reused with a different body (`idempotency_conflict`, which no retry fixes), the idempotency key is still held by the request that first sent it (`idempotency_conflict`, and once that request has answered the same call with the same key replays its answer), there is no webhook URL configured for the key's mode so there is nowhere to send (`webhook_endpoint_not_configured`), the event is a courier position, which is never sent again (`event_not_resendable`), the email already has a Listo account (`account_exists`), the store's pickup point is still being moved (`pickup_point_pending`), or no courier is free for this trip right now (`no_couriers_available`). Worth repeating unchanged after a few minutes: `cancel_failed`, `charge_in_progress`, `pickup_point_pending`, `no_couriers_available`, and a call refused because its idempotency key is still held (repeat it with the same key). Every other refusal here needs the request or the object to change first.
+     * The request conflicts with the state of the world. The object is no longer in a state that allows this (`not_cancellable`, `not_reschedulable`, `not_retriable`, `not_editable`, `not_refundable`, `not_reactivatable`, `plan_ended`), the cancellation did not go through (`cancel_failed`), the plan's charge is still with the bank (`charge_in_progress`), an add-on's first payment is still with the bank (`charge_in_flight`), the idempotency key was reused with a different body (`idempotency_conflict`, which no retry fixes), the idempotency key is still held by the request that first sent it (`idempotency_conflict`, and once that request has answered the same call with the same key replays its answer), there is no webhook URL configured for the key's mode so there is nowhere to send (`webhook_endpoint_not_configured`), the event is a courier position, which is never sent again (`event_not_resendable`), the email already has a Listo account (`account_exists`), the store's pickup point is still being moved (`pickup_point_pending`), or no courier is free for this trip right now (`no_couriers_available`). Worth repeating unchanged after a few minutes: `cancel_failed`, `charge_in_progress`, `charge_in_flight`, `pickup_point_pending`, `no_couriers_available`, and a call refused because its idempotency key is still held (repeat it with the same key). Every other refusal here needs the request or the object to change first.
      */
     409: ErrorResponse;
     /**
@@ -2432,7 +2550,7 @@ export type RefundDeliveryErrors = {
      */
     404: ErrorResponse;
     /**
-     * The request conflicts with the state of the world. The object is no longer in a state that allows this (`not_cancellable`, `not_reschedulable`, `not_retriable`, `not_editable`, `not_refundable`, `not_reactivatable`, `plan_ended`), the cancellation did not go through (`cancel_failed`), the plan's charge is still with the bank (`charge_in_progress`), the idempotency key was reused with a different body (`idempotency_conflict`, which no retry fixes), the idempotency key is still held by the request that first sent it (`idempotency_conflict`, and once that request has answered the same call with the same key replays its answer), there is no webhook URL configured for the key's mode so there is nowhere to send (`webhook_endpoint_not_configured`), the event is a courier position, which is never sent again (`event_not_resendable`), the email already has a Listo account (`account_exists`), the store's pickup point is still being moved (`pickup_point_pending`), or no courier is free for this trip right now (`no_couriers_available`). Worth repeating unchanged after a few minutes: `cancel_failed`, `charge_in_progress`, `pickup_point_pending`, `no_couriers_available`, and a call refused because its idempotency key is still held (repeat it with the same key). Every other refusal here needs the request or the object to change first.
+     * The request conflicts with the state of the world. The object is no longer in a state that allows this (`not_cancellable`, `not_reschedulable`, `not_retriable`, `not_editable`, `not_refundable`, `not_reactivatable`, `plan_ended`), the cancellation did not go through (`cancel_failed`), the plan's charge is still with the bank (`charge_in_progress`), an add-on's first payment is still with the bank (`charge_in_flight`), the idempotency key was reused with a different body (`idempotency_conflict`, which no retry fixes), the idempotency key is still held by the request that first sent it (`idempotency_conflict`, and once that request has answered the same call with the same key replays its answer), there is no webhook URL configured for the key's mode so there is nowhere to send (`webhook_endpoint_not_configured`), the event is a courier position, which is never sent again (`event_not_resendable`), the email already has a Listo account (`account_exists`), the store's pickup point is still being moved (`pickup_point_pending`), or no courier is free for this trip right now (`no_couriers_available`). Worth repeating unchanged after a few minutes: `cancel_failed`, `charge_in_progress`, `charge_in_flight`, `pickup_point_pending`, `no_couriers_available`, and a call refused because its idempotency key is still held (repeat it with the same key). Every other refusal here needs the request or the object to change first.
      */
     409: ErrorResponse;
     /**
@@ -2471,7 +2589,7 @@ export type RetryDeliveryErrors = {
      */
     404: ErrorResponse;
     /**
-     * The request conflicts with the state of the world. The object is no longer in a state that allows this (`not_cancellable`, `not_reschedulable`, `not_retriable`, `not_editable`, `not_refundable`, `not_reactivatable`, `plan_ended`), the cancellation did not go through (`cancel_failed`), the plan's charge is still with the bank (`charge_in_progress`), the idempotency key was reused with a different body (`idempotency_conflict`, which no retry fixes), the idempotency key is still held by the request that first sent it (`idempotency_conflict`, and once that request has answered the same call with the same key replays its answer), there is no webhook URL configured for the key's mode so there is nowhere to send (`webhook_endpoint_not_configured`), the event is a courier position, which is never sent again (`event_not_resendable`), the email already has a Listo account (`account_exists`), the store's pickup point is still being moved (`pickup_point_pending`), or no courier is free for this trip right now (`no_couriers_available`). Worth repeating unchanged after a few minutes: `cancel_failed`, `charge_in_progress`, `pickup_point_pending`, `no_couriers_available`, and a call refused because its idempotency key is still held (repeat it with the same key). Every other refusal here needs the request or the object to change first.
+     * The request conflicts with the state of the world. The object is no longer in a state that allows this (`not_cancellable`, `not_reschedulable`, `not_retriable`, `not_editable`, `not_refundable`, `not_reactivatable`, `plan_ended`), the cancellation did not go through (`cancel_failed`), the plan's charge is still with the bank (`charge_in_progress`), an add-on's first payment is still with the bank (`charge_in_flight`), the idempotency key was reused with a different body (`idempotency_conflict`, which no retry fixes), the idempotency key is still held by the request that first sent it (`idempotency_conflict`, and once that request has answered the same call with the same key replays its answer), there is no webhook URL configured for the key's mode so there is nowhere to send (`webhook_endpoint_not_configured`), the event is a courier position, which is never sent again (`event_not_resendable`), the email already has a Listo account (`account_exists`), the store's pickup point is still being moved (`pickup_point_pending`), or no courier is free for this trip right now (`no_couriers_available`). Worth repeating unchanged after a few minutes: `cancel_failed`, `charge_in_progress`, `charge_in_flight`, `pickup_point_pending`, `no_couriers_available`, and a call refused because its idempotency key is still held (repeat it with the same key). Every other refusal here needs the request or the object to change first.
      */
     409: ErrorResponse;
     /**
@@ -2541,7 +2659,7 @@ export type RescheduleDeliveryErrors = {
      */
     404: ErrorResponse;
     /**
-     * The request conflicts with the state of the world. The object is no longer in a state that allows this (`not_cancellable`, `not_reschedulable`, `not_retriable`, `not_editable`, `not_refundable`, `not_reactivatable`, `plan_ended`), the cancellation did not go through (`cancel_failed`), the plan's charge is still with the bank (`charge_in_progress`), the idempotency key was reused with a different body (`idempotency_conflict`, which no retry fixes), the idempotency key is still held by the request that first sent it (`idempotency_conflict`, and once that request has answered the same call with the same key replays its answer), there is no webhook URL configured for the key's mode so there is nowhere to send (`webhook_endpoint_not_configured`), the event is a courier position, which is never sent again (`event_not_resendable`), the email already has a Listo account (`account_exists`), the store's pickup point is still being moved (`pickup_point_pending`), or no courier is free for this trip right now (`no_couriers_available`). Worth repeating unchanged after a few minutes: `cancel_failed`, `charge_in_progress`, `pickup_point_pending`, `no_couriers_available`, and a call refused because its idempotency key is still held (repeat it with the same key). Every other refusal here needs the request or the object to change first.
+     * The request conflicts with the state of the world. The object is no longer in a state that allows this (`not_cancellable`, `not_reschedulable`, `not_retriable`, `not_editable`, `not_refundable`, `not_reactivatable`, `plan_ended`), the cancellation did not go through (`cancel_failed`), the plan's charge is still with the bank (`charge_in_progress`), an add-on's first payment is still with the bank (`charge_in_flight`), the idempotency key was reused with a different body (`idempotency_conflict`, which no retry fixes), the idempotency key is still held by the request that first sent it (`idempotency_conflict`, and once that request has answered the same call with the same key replays its answer), there is no webhook URL configured for the key's mode so there is nowhere to send (`webhook_endpoint_not_configured`), the event is a courier position, which is never sent again (`event_not_resendable`), the email already has a Listo account (`account_exists`), the store's pickup point is still being moved (`pickup_point_pending`), or no courier is free for this trip right now (`no_couriers_available`). Worth repeating unchanged after a few minutes: `cancel_failed`, `charge_in_progress`, `charge_in_flight`, `pickup_point_pending`, `no_couriers_available`, and a call refused because its idempotency key is still held (repeat it with the same key). Every other refusal here needs the request or the object to change first.
      */
     409: ErrorResponse;
     /**
@@ -2624,7 +2742,7 @@ export type ResendEventErrors = {
      */
     404: ErrorResponse;
     /**
-     * The request conflicts with the state of the world. The object is no longer in a state that allows this (`not_cancellable`, `not_reschedulable`, `not_retriable`, `not_editable`, `not_refundable`, `not_reactivatable`, `plan_ended`), the cancellation did not go through (`cancel_failed`), the plan's charge is still with the bank (`charge_in_progress`), the idempotency key was reused with a different body (`idempotency_conflict`, which no retry fixes), the idempotency key is still held by the request that first sent it (`idempotency_conflict`, and once that request has answered the same call with the same key replays its answer), there is no webhook URL configured for the key's mode so there is nowhere to send (`webhook_endpoint_not_configured`), the event is a courier position, which is never sent again (`event_not_resendable`), the email already has a Listo account (`account_exists`), the store's pickup point is still being moved (`pickup_point_pending`), or no courier is free for this trip right now (`no_couriers_available`). Worth repeating unchanged after a few minutes: `cancel_failed`, `charge_in_progress`, `pickup_point_pending`, `no_couriers_available`, and a call refused because its idempotency key is still held (repeat it with the same key). Every other refusal here needs the request or the object to change first.
+     * The request conflicts with the state of the world. The object is no longer in a state that allows this (`not_cancellable`, `not_reschedulable`, `not_retriable`, `not_editable`, `not_refundable`, `not_reactivatable`, `plan_ended`), the cancellation did not go through (`cancel_failed`), the plan's charge is still with the bank (`charge_in_progress`), an add-on's first payment is still with the bank (`charge_in_flight`), the idempotency key was reused with a different body (`idempotency_conflict`, which no retry fixes), the idempotency key is still held by the request that first sent it (`idempotency_conflict`, and once that request has answered the same call with the same key replays its answer), there is no webhook URL configured for the key's mode so there is nowhere to send (`webhook_endpoint_not_configured`), the event is a courier position, which is never sent again (`event_not_resendable`), the email already has a Listo account (`account_exists`), the store's pickup point is still being moved (`pickup_point_pending`), or no courier is free for this trip right now (`no_couriers_available`). Worth repeating unchanged after a few minutes: `cancel_failed`, `charge_in_progress`, `charge_in_flight`, `pickup_point_pending`, `no_couriers_available`, and a call refused because its idempotency key is still held (repeat it with the same key). Every other refusal here needs the request or the object to change first.
      */
     409: ErrorResponse;
     /**
@@ -2756,7 +2874,7 @@ export type CreateQuoteErrors = {
      */
     404: ErrorResponse;
     /**
-     * The request conflicts with the state of the world. The object is no longer in a state that allows this (`not_cancellable`, `not_reschedulable`, `not_retriable`, `not_editable`, `not_refundable`, `not_reactivatable`, `plan_ended`), the cancellation did not go through (`cancel_failed`), the plan's charge is still with the bank (`charge_in_progress`), the idempotency key was reused with a different body (`idempotency_conflict`, which no retry fixes), the idempotency key is still held by the request that first sent it (`idempotency_conflict`, and once that request has answered the same call with the same key replays its answer), there is no webhook URL configured for the key's mode so there is nowhere to send (`webhook_endpoint_not_configured`), the event is a courier position, which is never sent again (`event_not_resendable`), the email already has a Listo account (`account_exists`), the store's pickup point is still being moved (`pickup_point_pending`), or no courier is free for this trip right now (`no_couriers_available`). Worth repeating unchanged after a few minutes: `cancel_failed`, `charge_in_progress`, `pickup_point_pending`, `no_couriers_available`, and a call refused because its idempotency key is still held (repeat it with the same key). Every other refusal here needs the request or the object to change first.
+     * The request conflicts with the state of the world. The object is no longer in a state that allows this (`not_cancellable`, `not_reschedulable`, `not_retriable`, `not_editable`, `not_refundable`, `not_reactivatable`, `plan_ended`), the cancellation did not go through (`cancel_failed`), the plan's charge is still with the bank (`charge_in_progress`), an add-on's first payment is still with the bank (`charge_in_flight`), the idempotency key was reused with a different body (`idempotency_conflict`, which no retry fixes), the idempotency key is still held by the request that first sent it (`idempotency_conflict`, and once that request has answered the same call with the same key replays its answer), there is no webhook URL configured for the key's mode so there is nowhere to send (`webhook_endpoint_not_configured`), the event is a courier position, which is never sent again (`event_not_resendable`), the email already has a Listo account (`account_exists`), the store's pickup point is still being moved (`pickup_point_pending`), or no courier is free for this trip right now (`no_couriers_available`). Worth repeating unchanged after a few minutes: `cancel_failed`, `charge_in_progress`, `charge_in_flight`, `pickup_point_pending`, `no_couriers_available`, and a call refused because its idempotency key is still held (repeat it with the same key). Every other refusal here needs the request or the object to change first.
      */
     409: ErrorResponse;
     /**
@@ -2893,7 +3011,7 @@ export type CreateStoreErrors = {
      */
     403: ErrorResponse;
     /**
-     * The request conflicts with the state of the world. The object is no longer in a state that allows this (`not_cancellable`, `not_reschedulable`, `not_retriable`, `not_editable`, `not_refundable`, `not_reactivatable`, `plan_ended`), the cancellation did not go through (`cancel_failed`), the plan's charge is still with the bank (`charge_in_progress`), the idempotency key was reused with a different body (`idempotency_conflict`, which no retry fixes), the idempotency key is still held by the request that first sent it (`idempotency_conflict`, and once that request has answered the same call with the same key replays its answer), there is no webhook URL configured for the key's mode so there is nowhere to send (`webhook_endpoint_not_configured`), the event is a courier position, which is never sent again (`event_not_resendable`), the email already has a Listo account (`account_exists`), the store's pickup point is still being moved (`pickup_point_pending`), or no courier is free for this trip right now (`no_couriers_available`). Worth repeating unchanged after a few minutes: `cancel_failed`, `charge_in_progress`, `pickup_point_pending`, `no_couriers_available`, and a call refused because its idempotency key is still held (repeat it with the same key). Every other refusal here needs the request or the object to change first.
+     * The request conflicts with the state of the world. The object is no longer in a state that allows this (`not_cancellable`, `not_reschedulable`, `not_retriable`, `not_editable`, `not_refundable`, `not_reactivatable`, `plan_ended`), the cancellation did not go through (`cancel_failed`), the plan's charge is still with the bank (`charge_in_progress`), an add-on's first payment is still with the bank (`charge_in_flight`), the idempotency key was reused with a different body (`idempotency_conflict`, which no retry fixes), the idempotency key is still held by the request that first sent it (`idempotency_conflict`, and once that request has answered the same call with the same key replays its answer), there is no webhook URL configured for the key's mode so there is nowhere to send (`webhook_endpoint_not_configured`), the event is a courier position, which is never sent again (`event_not_resendable`), the email already has a Listo account (`account_exists`), the store's pickup point is still being moved (`pickup_point_pending`), or no courier is free for this trip right now (`no_couriers_available`). Worth repeating unchanged after a few minutes: `cancel_failed`, `charge_in_progress`, `charge_in_flight`, `pickup_point_pending`, `no_couriers_available`, and a call refused because its idempotency key is still held (repeat it with the same key). Every other refusal here needs the request or the object to change first.
      */
     409: ErrorResponse;
     /**
@@ -3109,7 +3227,7 @@ export type ReactivateStorePlanErrors = {
      */
     404: ErrorResponse;
     /**
-     * The request conflicts with the state of the world. The object is no longer in a state that allows this (`not_cancellable`, `not_reschedulable`, `not_retriable`, `not_editable`, `not_refundable`, `not_reactivatable`, `plan_ended`), the cancellation did not go through (`cancel_failed`), the plan's charge is still with the bank (`charge_in_progress`), the idempotency key was reused with a different body (`idempotency_conflict`, which no retry fixes), the idempotency key is still held by the request that first sent it (`idempotency_conflict`, and once that request has answered the same call with the same key replays its answer), there is no webhook URL configured for the key's mode so there is nowhere to send (`webhook_endpoint_not_configured`), the event is a courier position, which is never sent again (`event_not_resendable`), the email already has a Listo account (`account_exists`), the store's pickup point is still being moved (`pickup_point_pending`), or no courier is free for this trip right now (`no_couriers_available`). Worth repeating unchanged after a few minutes: `cancel_failed`, `charge_in_progress`, `pickup_point_pending`, `no_couriers_available`, and a call refused because its idempotency key is still held (repeat it with the same key). Every other refusal here needs the request or the object to change first.
+     * The request conflicts with the state of the world. The object is no longer in a state that allows this (`not_cancellable`, `not_reschedulable`, `not_retriable`, `not_editable`, `not_refundable`, `not_reactivatable`, `plan_ended`), the cancellation did not go through (`cancel_failed`), the plan's charge is still with the bank (`charge_in_progress`), an add-on's first payment is still with the bank (`charge_in_flight`), the idempotency key was reused with a different body (`idempotency_conflict`, which no retry fixes), the idempotency key is still held by the request that first sent it (`idempotency_conflict`, and once that request has answered the same call with the same key replays its answer), there is no webhook URL configured for the key's mode so there is nowhere to send (`webhook_endpoint_not_configured`), the event is a courier position, which is never sent again (`event_not_resendable`), the email already has a Listo account (`account_exists`), the store's pickup point is still being moved (`pickup_point_pending`), or no courier is free for this trip right now (`no_couriers_available`). Worth repeating unchanged after a few minutes: `cancel_failed`, `charge_in_progress`, `charge_in_flight`, `pickup_point_pending`, `no_couriers_available`, and a call refused because its idempotency key is still held (repeat it with the same key). Every other refusal here needs the request or the object to change first.
      */
     409: ErrorResponse;
     /**
@@ -3148,7 +3266,7 @@ export type UndoStorePlanCancellationErrors = {
      */
     404: ErrorResponse;
     /**
-     * The request conflicts with the state of the world. The object is no longer in a state that allows this (`not_cancellable`, `not_reschedulable`, `not_retriable`, `not_editable`, `not_refundable`, `not_reactivatable`, `plan_ended`), the cancellation did not go through (`cancel_failed`), the plan's charge is still with the bank (`charge_in_progress`), the idempotency key was reused with a different body (`idempotency_conflict`, which no retry fixes), the idempotency key is still held by the request that first sent it (`idempotency_conflict`, and once that request has answered the same call with the same key replays its answer), there is no webhook URL configured for the key's mode so there is nowhere to send (`webhook_endpoint_not_configured`), the event is a courier position, which is never sent again (`event_not_resendable`), the email already has a Listo account (`account_exists`), the store's pickup point is still being moved (`pickup_point_pending`), or no courier is free for this trip right now (`no_couriers_available`). Worth repeating unchanged after a few minutes: `cancel_failed`, `charge_in_progress`, `pickup_point_pending`, `no_couriers_available`, and a call refused because its idempotency key is still held (repeat it with the same key). Every other refusal here needs the request or the object to change first.
+     * The request conflicts with the state of the world. The object is no longer in a state that allows this (`not_cancellable`, `not_reschedulable`, `not_retriable`, `not_editable`, `not_refundable`, `not_reactivatable`, `plan_ended`), the cancellation did not go through (`cancel_failed`), the plan's charge is still with the bank (`charge_in_progress`), an add-on's first payment is still with the bank (`charge_in_flight`), the idempotency key was reused with a different body (`idempotency_conflict`, which no retry fixes), the idempotency key is still held by the request that first sent it (`idempotency_conflict`, and once that request has answered the same call with the same key replays its answer), there is no webhook URL configured for the key's mode so there is nowhere to send (`webhook_endpoint_not_configured`), the event is a courier position, which is never sent again (`event_not_resendable`), the email already has a Listo account (`account_exists`), the store's pickup point is still being moved (`pickup_point_pending`), or no courier is free for this trip right now (`no_couriers_available`). Worth repeating unchanged after a few minutes: `cancel_failed`, `charge_in_progress`, `charge_in_flight`, `pickup_point_pending`, `no_couriers_available`, and a call refused because its idempotency key is still held (repeat it with the same key). Every other refusal here needs the request or the object to change first.
      */
     409: ErrorResponse;
 };
@@ -3189,7 +3307,7 @@ export type CancelStorePlanErrors = {
      */
     404: ErrorResponse;
     /**
-     * The request conflicts with the state of the world. The object is no longer in a state that allows this (`not_cancellable`, `not_reschedulable`, `not_retriable`, `not_editable`, `not_refundable`, `not_reactivatable`, `plan_ended`), the cancellation did not go through (`cancel_failed`), the plan's charge is still with the bank (`charge_in_progress`), the idempotency key was reused with a different body (`idempotency_conflict`, which no retry fixes), the idempotency key is still held by the request that first sent it (`idempotency_conflict`, and once that request has answered the same call with the same key replays its answer), there is no webhook URL configured for the key's mode so there is nowhere to send (`webhook_endpoint_not_configured`), the event is a courier position, which is never sent again (`event_not_resendable`), the email already has a Listo account (`account_exists`), the store's pickup point is still being moved (`pickup_point_pending`), or no courier is free for this trip right now (`no_couriers_available`). Worth repeating unchanged after a few minutes: `cancel_failed`, `charge_in_progress`, `pickup_point_pending`, `no_couriers_available`, and a call refused because its idempotency key is still held (repeat it with the same key). Every other refusal here needs the request or the object to change first.
+     * The request conflicts with the state of the world. The object is no longer in a state that allows this (`not_cancellable`, `not_reschedulable`, `not_retriable`, `not_editable`, `not_refundable`, `not_reactivatable`, `plan_ended`), the cancellation did not go through (`cancel_failed`), the plan's charge is still with the bank (`charge_in_progress`), an add-on's first payment is still with the bank (`charge_in_flight`), the idempotency key was reused with a different body (`idempotency_conflict`, which no retry fixes), the idempotency key is still held by the request that first sent it (`idempotency_conflict`, and once that request has answered the same call with the same key replays its answer), there is no webhook URL configured for the key's mode so there is nowhere to send (`webhook_endpoint_not_configured`), the event is a courier position, which is never sent again (`event_not_resendable`), the email already has a Listo account (`account_exists`), the store's pickup point is still being moved (`pickup_point_pending`), or no courier is free for this trip right now (`no_couriers_available`). Worth repeating unchanged after a few minutes: `cancel_failed`, `charge_in_progress`, `charge_in_flight`, `pickup_point_pending`, `no_couriers_available`, and a call refused because its idempotency key is still held (repeat it with the same key). Every other refusal here needs the request or the object to change first.
      */
     409: ErrorResponse;
     /**
@@ -3358,7 +3476,7 @@ export type SendTestWebhookErrors = {
      */
     403: ErrorResponse;
     /**
-     * The request conflicts with the state of the world. The object is no longer in a state that allows this (`not_cancellable`, `not_reschedulable`, `not_retriable`, `not_editable`, `not_refundable`, `not_reactivatable`, `plan_ended`), the cancellation did not go through (`cancel_failed`), the plan's charge is still with the bank (`charge_in_progress`), the idempotency key was reused with a different body (`idempotency_conflict`, which no retry fixes), the idempotency key is still held by the request that first sent it (`idempotency_conflict`, and once that request has answered the same call with the same key replays its answer), there is no webhook URL configured for the key's mode so there is nowhere to send (`webhook_endpoint_not_configured`), the event is a courier position, which is never sent again (`event_not_resendable`), the email already has a Listo account (`account_exists`), the store's pickup point is still being moved (`pickup_point_pending`), or no courier is free for this trip right now (`no_couriers_available`). Worth repeating unchanged after a few minutes: `cancel_failed`, `charge_in_progress`, `pickup_point_pending`, `no_couriers_available`, and a call refused because its idempotency key is still held (repeat it with the same key). Every other refusal here needs the request or the object to change first.
+     * The request conflicts with the state of the world. The object is no longer in a state that allows this (`not_cancellable`, `not_reschedulable`, `not_retriable`, `not_editable`, `not_refundable`, `not_reactivatable`, `plan_ended`), the cancellation did not go through (`cancel_failed`), the plan's charge is still with the bank (`charge_in_progress`), an add-on's first payment is still with the bank (`charge_in_flight`), the idempotency key was reused with a different body (`idempotency_conflict`, which no retry fixes), the idempotency key is still held by the request that first sent it (`idempotency_conflict`, and once that request has answered the same call with the same key replays its answer), there is no webhook URL configured for the key's mode so there is nowhere to send (`webhook_endpoint_not_configured`), the event is a courier position, which is never sent again (`event_not_resendable`), the email already has a Listo account (`account_exists`), the store's pickup point is still being moved (`pickup_point_pending`), or no courier is free for this trip right now (`no_couriers_available`). Worth repeating unchanged after a few minutes: `cancel_failed`, `charge_in_progress`, `charge_in_flight`, `pickup_point_pending`, `no_couriers_available`, and a call refused because its idempotency key is still held (repeat it with the same key). Every other refusal here needs the request or the object to change first.
      */
     409: ErrorResponse;
     /**
