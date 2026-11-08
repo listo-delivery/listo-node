@@ -1,0 +1,136 @@
+# PUBLISHES THIS PACKAGE TO npm. This file is OUTPUT: it is written here by the
+# sync in Listo's own repository, whose copy of this file is its source, and a
+# change to it is released as a new version like any other.
+#
+# WHEN IT RUNS: when the sync pushes a tag `v<version>`, and by hand to retry:
+#   gh workflow run publish.yml --repo listo-delivery/listo-node --ref v<version>
+# It refuses anything that is not a tag, and a tag that is not `v` plus the version
+# in package.json, so a published version always names the tag it was built from. It
+# builds from this repository's own tree and SKIPS (green) when that version is
+# already on npm, so a retry is safe and never overwrites a release.
+#
+# TWO WAYS TO AUTHENTICATE, logged by name and never by value. The FIRST publish of
+# a package uses the `NPM_TOKEN` secret of the environment `release` (npm cannot
+# register a trusted publisher for a package that does not exist yet). With that
+# secret empty, npm trusted publishing (OIDC) is used, which needs the trusted
+# publisher configured on npmjs.com for this repository, the workflow publish.yml and
+# the environment release, and npm 11.5.1 or newer on Node 22.14 or newer.
+#
+# PROVENANCE IS ON (`--provenance`): this repository is public, and package.json's
+# `repository` names it, which npm checks against the build's identity.
+#
+# `ubuntu-latest`: this repository is public, so GitHub-hosted runners are free, and
+# npm trusted publishing refuses self-hosted runners. Every action is pinned by full
+# commit SHA, the release tag in the comment.
+
+name: Publish to npm
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+# A second tag waits for the first run; a publish is never cancelled half way.
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      # A boolean, never the token: the secret is handed only to the step that needs it.
+      HAS_NPM_TOKEN: ${{ secrets.NPM_TOKEN != '' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      - name: Require an npm that can publish through trusted publishing
+        run: |
+          echo "node $(node --version), npm $(npm --version)"
+          node -e '
+            const [a, b, c] = process.argv[1].split(".").map(Number);
+            if (a < 11 || (a === 11 && (b < 5 || (b === 5 && c < 1)))) {
+              console.error("npm " + process.argv[1] + " is older than 11.5.1, the first release that can publish through trusted publishing");
+              process.exit(1);
+            }
+          ' "$(npm --version)"
+
+      - name: Check the tag against the manifest
+        id: version
+        run: |
+          version="$(node -p 'require("./package.json").version')"
+          if [ "$GITHUB_REF_TYPE" != "tag" ]; then
+            echo "::error::Run this from a tag, not from $GITHUB_REF. Retry with: gh workflow run publish.yml --repo listo-delivery/listo-node --ref v$version"
+            exit 1
+          fi
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::The tag is $GITHUB_REF_NAME but package.json says version $version, so the tag must be v$version."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Is this version already on npm
+        id: registry
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          status="$(curl --silent --show-error --max-time 60 --retry 3 --output /dev/null --write-out '%{http_code}' "https://registry.npmjs.org/listo-delivery/$VERSION")" || status=000
+          case "$status" in
+            200)
+              echo "listo-delivery $VERSION is already on npm: nothing to publish."
+              echo "published=true" >> "$GITHUB_OUTPUT"
+              ;;
+            404)
+              echo "listo-delivery $VERSION is not on npm yet: publishing."
+              echo "published=false" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "::error::npm answered HTTP $status, so whether $VERSION is published is unknown. Not publishing."
+              exit 1
+              ;;
+          esac
+
+      - name: Install from the lockfile
+        if: steps.registry.outputs.published == 'false'
+        run: npm ci --no-audit --no-fund
+
+      # `npm publish` runs `prepack`, which builds dist/ from src/. The npmrc line is
+      # written with the variable NOT expanded, so npm reads the token from the
+      # environment at publish time and the value is never in a file or the log.
+      - name: Publish to npm with the token (first publish)
+        if: steps.registry.outputs.published == 'false' && env.HAS_NPM_TOKEN == 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          echo "publishing with the token (NPM_TOKEN is set on the release environment)"
+          printf '%s\n' '//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}' > "$RUNNER_TEMP/npmrc"
+          NPM_CONFIG_USERCONFIG="$RUNNER_TEMP/npmrc" npm publish --provenance --access public
+
+      - name: Publish to npm through trusted publishing
+        if: steps.registry.outputs.published == 'false' && env.HAS_NPM_TOKEN != 'true'
+        run: |
+          echo "publishing through trusted publishing (no NPM_TOKEN on the release environment)"
+          npm publish --provenance --access public

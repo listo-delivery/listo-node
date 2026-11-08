@@ -1,0 +1,50 @@
+{
+  "name": "listo-delivery",
+  "version": "0.1.0",
+  "description": "Official TypeScript SDK for the Listo Delivery API.",
+  "homepage": "https://docs.listo.delivery",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/listo-delivery/listo-node.git"
+  },
+  "bugs": {
+    "url": "https://github.com/listo-delivery/listo-node/issues"
+  },
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "listo-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "generate": "openapi-ts && node scripts/generate-resources.mjs",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test \"test/*.tests.ts\"",
+    "prepack": "npm run build"
+  },
+  "overrides": {
+    "js-yaml": "4.3.2"
+  },
+  "devDependencies": {
+    "@hey-api/openapi-ts": "0.99.0",
+    "@types/js-yaml": "4.0.9",
+    "@types/node": "22.20.5",
+    "js-yaml": "4.3.2",
+    "typescript": "5.9.3"
+  }
+}
