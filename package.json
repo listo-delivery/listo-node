@@ -1,6 +1,6 @@
 {
   "name": "listo-delivery",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Official TypeScript SDK for the Listo Delivery API.",
   "homepage": "https://docs.listo.delivery",
   "repository": {
