@@ -331,6 +331,17 @@ export const listDeliveries = <ThrowOnError extends boolean = false>(options?: O
  * `Idempotency-Key` creates the order. See
  * [Store add-ons](https://docs.listo.delivery/en/guides/store-add-ons).
  *
+ * A `prepaid` or `card` order whose `order_value_cents` is above the
+ * store's limit for that payment type is refused with `422
+ * order_value_over_cap`, with `error.param` `order_value_cents`, and
+ * nothing is created or debited. The delivery fee does not count toward
+ * the limit, and a value equal to it is accepted. The limits are on the
+ * store, in `order_value_limits`. A quote you bind is checked again, so a
+ * quote priced under a higher limit can be refused here once that limit
+ * has ended. It is not `retryable`: send a smaller order, or contact Listo
+ * to raise the store's limit. A `cash` order has its own limit and is
+ * refused with `cash_over_cap`.
+ *
  * A dropoff beyond the store's 15 km service area is refused with `422
  * out_of_service_area`, which is final. The courier network can also
  * refuse the distance of a dropoff at the very edge of that circle, and
@@ -806,6 +817,16 @@ export const ping = <ThrowOnError extends boolean = false>(options?: Options<Pin
  * request couriers right now. It is not `retryable`: the identical call
  * fails until the plan is paid or restarted, or the cycle renews. See
  * [Plan and billing](https://docs.listo.delivery/en/guides/plan-and-billing).
+ *
+ * A `prepaid` or `card` order, or a quote with no `payment_method` (which
+ * is judged as `prepaid`, because only a prepaid delivery can book it),
+ * whose `order_value_cents` is above the store's limit for that payment
+ * type is refused with `422 order_value_over_cap`, with `error.param`
+ * `order_value_cents`, and nothing is created. The delivery fee does not
+ * count toward the limit, and a value equal to it is accepted. The limits
+ * are on the store, in `order_value_limits`. It is not `retryable`: send a
+ * smaller order, or contact Listo to raise the store's limit. A `cash`
+ * quote has its own limit and is refused with `cash_over_cap`.
  *
  */
 export const createQuote = <ThrowOnError extends boolean = false>(options: Options<CreateQuoteData, ThrowOnError>): RequestResult<CreateQuoteResponses, CreateQuoteErrors, ThrowOnError> => (options.client ?? client).post<CreateQuoteResponses, CreateQuoteErrors, ThrowOnError>({

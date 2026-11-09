@@ -1109,6 +1109,33 @@ export type Store = {
         wallet: StoreAddOn;
         full_console: StoreAddOn;
     } | null;
+    /**
+     * The most an order may be worth at this store right now, per payment
+     * type. A request above it is refused with `order_value_over_cap`
+     * (prepaid and card) or `cash_over_cap` (cash). The limits can change
+     * without a `store.updated` event, for example during a special limit,
+     * so read them from the store when you need them.
+     *
+     */
+    order_value_limits: {
+        /**
+         * The most an order you record as already paid (`prepaid`) may be
+         * worth at this store, in cents.
+         *
+         */
+        prepaid_max_cents: number;
+        /**
+         * The most the food of an order paid by card link may be worth at
+         * this store, in cents. The delivery fee does not count toward it.
+         *
+         */
+        card_max_cents: number;
+        /**
+         * The most the courier may collect in cash at this store (the order value plus the customer's share of the fee), in cents.
+         *
+         */
+        cash_max_cents: number;
+    };
 };
 
 /**
@@ -1757,7 +1784,10 @@ export type CreateQuoteRequest = {
     payment_method?: 'prepaid' | 'cash' | 'card';
     /**
      * The value of the order, in centavos. Required for a `cash`
-     * quote, where it is what the courier collects.
+     * quote, where it is what the courier collects. A `prepaid` or
+     * `card` quote, or one with no `payment_method`, is refused with
+     * `422 order_value_over_cap` when this is above the store's limit
+     * (`order_value_limits` on the store).
      *
      */
     order_value_cents?: number;
@@ -1803,7 +1833,11 @@ export type CreateDeliveryRequest = {
      */
     payment_method: 'prepaid' | 'cash' | 'card';
     /**
-     * The value of the order, in centavos.
+     * The value of the order, in centavos. A `prepaid` or `card` order
+     * is refused with `422 order_value_over_cap` when this is above the
+     * store's limit for that payment type (`order_value_limits` on the
+     * store).
+     *
      */
     order_value_cents: number;
     /**
