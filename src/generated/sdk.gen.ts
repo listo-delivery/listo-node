@@ -323,6 +323,14 @@ export const listDeliveries = <ThrowOnError extends boolean = false>(options?: O
  * is not `retryable`. See
  * [Plan and billing](https://docs.listo.delivery/en/guides/plan-and-billing).
  *
+ * A card create (`payment_method: card`) at a store of an account on
+ * self-serve pricing whose `card_payments` add-on is off is refused with
+ * `402 add_on_required`, `error.param` `payment_method`, and nothing is
+ * created or debited. It is not `retryable`: the identical request fails
+ * until `PATCH /v1/stores/{id}` switches the add-on on, and then the same
+ * `Idempotency-Key` creates the order. See
+ * [Store add-ons](https://docs.listo.delivery/en/guides/store-add-ons).
+ *
  * A dropoff beyond the store's 15 km service area is refused with `422
  * out_of_service_area`, which is final. The courier network can also
  * refuse the distance of a dropoff at the very edge of that circle, and
