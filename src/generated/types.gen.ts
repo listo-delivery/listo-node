@@ -4,11 +4,11 @@ export type ClientOptions = {
     baseUrl: 'https://api.listo.delivery' | (string & {});
 };
 
-export type Webhooks = DeliveryStatusChangedWebhookRequest | DeliveryUpdatedWebhookRequest | DeliveryCourierLocationWebhookRequest | DeliveryMessageSkippedWebhookRequest | WithdrawalUpdatedWebhookRequest | StoreUpdatedWebhookRequest | PostStoreConnectedWebhookRequest;
+export type Webhooks = DeliveryStatusChangedWebhookRequest | DeliveryUpdatedWebhookRequest | DeliveryCourierLocationWebhookRequest | DeliveryMessageSkippedWebhookRequest | DeliveryRatedWebhookRequest | WithdrawalUpdatedWebhookRequest | StoreUpdatedWebhookRequest | PostStoreConnectedWebhookRequest;
 
 /**
  * Every event your webhook endpoint receives, and every event the
- * debugging reads return: one of the seven below, told apart by `type`.
+ * debugging reads return: one of the eight below, told apart by `type`.
  * `data` is the object the event is about, and its shape depends on
  * `type`. See `WebhookEventEnvelope` for the fields they all share and for
  * how delivery behaves (at-least-once, unordered).
@@ -28,7 +28,9 @@ export type WebhookEvent = ({
     type: 'store.connected';
 } & StoreConnectedEvent) | ({
     type: 'delivery.message_skipped';
-} & DeliveryMessageSkippedEvent);
+} & DeliveryMessageSkippedEvent) | ({
+    type: 'delivery.rated';
+} & DeliveryRatedEvent);
 
 /**
  * The fields every event shares. Delivery is at-least-once and unordered
@@ -109,6 +111,14 @@ export type DeliveryMessageSkippedEvent = WebhookEventEnvelope & {
      */
     type: 'delivery.message_skipped';
     data: DeliveryMessageSkipped;
+};
+
+export type DeliveryRatedEvent = WebhookEventEnvelope & {
+    /**
+     * Which event this is.
+     */
+    type: 'delivery.rated';
+    data: Delivery;
 };
 
 /**
@@ -612,6 +622,33 @@ export type Delivery = {
         } | null;
     };
     /**
+     * What the customer rated the FOOD, for a store with the `ratings`
+     * add-on. Null for every other delivery, so the key is always there.
+     * It is filled only for a rating the customer gave while the add-on
+     * was on for the store: a rating given before you switched it on, or
+     * after it ended, stays null for good, and a rating given while it was
+     * on stays here after the add-on ends. The customer rates the food and
+     * the delivery separately; only the food half is here. The `delivery.rated`
+     * event carries the delivery with this filled, once.
+     *
+     */
+    rating: {
+        /**
+         * The customer's stars for the food, 1 to 5.
+         */
+        food_stars: number;
+        /**
+         * What went wrong with the food, when the customer rated it 3 stars or
+         * fewer and chose a reason. Empty otherwise.
+         *
+         */
+        food_reasons: Array<'cold' | 'missing_item' | 'wrong_order' | 'other'>;
+        /**
+         * When the customer gave the rating.
+         */
+        rated_at: string;
+    } | null;
+    /**
      * Who called the order off, and why. Null on an order that was not cancelled.
      */
     cancellation: {
@@ -1077,7 +1114,9 @@ export type Store = {
 /**
  * One paid add-on of a store and where it stands. `customer_whatsapp`
  * sends the customer WhatsApp updates on each delivered trip, `ratings`
- * lets customers rate the delivery, `card_payments` lets the store take
+ * gives you the customer's rating of the food on the delivery (`rating`)
+ * and sends a `delivery.rated` event, for the ratings given while it is on;
+ * `card_payments` lets the store take
  * card payments, `wallet` gives the store its own balance, and
  * `full_console` gives the store its own console and its Plan Listo.
  *
@@ -2071,7 +2110,7 @@ export type SendTestWebhookRequest = {
     /**
      * The published event type to send a sample of.
      */
-    type: 'delivery.status_changed' | 'delivery.updated' | 'delivery.courier_location' | 'withdrawal.updated' | 'store.updated' | 'store.connected' | 'delivery.message_skipped';
+    type: 'delivery.status_changed' | 'delivery.updated' | 'delivery.courier_location' | 'withdrawal.updated' | 'store.updated' | 'store.connected' | 'delivery.message_skipped' | 'delivery.rated';
 };
 
 /**
@@ -2226,7 +2265,7 @@ export type WebhookDelivery = {
     /**
      * The type of that event.
      */
-    event_type: 'delivery.status_changed' | 'delivery.updated' | 'delivery.courier_location' | 'withdrawal.updated' | 'store.updated' | 'store.connected' | 'delivery.message_skipped';
+    event_type: 'delivery.status_changed' | 'delivery.updated' | 'delivery.courier_location' | 'withdrawal.updated' | 'store.updated' | 'store.connected' | 'delivery.message_skipped' | 'delivery.rated';
     /**
      * Which attempt this is for the event, counted from 1 in the order they
      * were made. A resend continues the count.
@@ -2699,7 +2738,7 @@ export type ListEventsData = {
         /**
          * Only events of one published type, such as `delivery.status_changed`. A value that is not a published type matches nothing. `delivery.courier_location` is left out of an unfiltered list and comes back only when you ask for it here.
          */
-        type?: 'delivery.status_changed' | 'delivery.updated' | 'delivery.courier_location' | 'withdrawal.updated' | 'store.updated' | 'store.connected' | 'delivery.message_skipped';
+        type?: 'delivery.status_changed' | 'delivery.updated' | 'delivery.courier_location' | 'withdrawal.updated' | 'store.updated' | 'store.connected' | 'delivery.message_skipped' | 'delivery.rated';
         /**
          * Only the events about one delivery, by its `dlv_` id. An id that is not one of your deliveries in this mode is `404 not_found`.
          */
@@ -3724,6 +3763,15 @@ export type DeliveryMessageSkippedWebhookPayload = DeliveryMessageSkippedEvent;
 export type DeliveryMessageSkippedWebhookRequest = {
     body: DeliveryMessageSkippedWebhookPayload;
     key: 'delivery.message_skipped';
+    path?: never;
+    query?: never;
+};
+
+export type DeliveryRatedWebhookPayload = DeliveryRatedEvent;
+
+export type DeliveryRatedWebhookRequest = {
+    body: DeliveryRatedWebhookPayload;
+    key: 'delivery.rated';
     path?: never;
     query?: never;
 };
