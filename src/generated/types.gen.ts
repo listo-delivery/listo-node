@@ -2837,7 +2837,7 @@ export type ResendEventErrors = {
      */
     409: ErrorResponse;
     /**
-     * Too many requests (`rate_limited`). Back off and retry. A resend refused because the event was already sent again 5 times in the last hour is `resend_limit_reached`, and a test webhook refused because 30 were already sent in the last hour is `test_webhook_limit_reached`; both are worth retrying once the hour has moved on.
+     * Too many requests (`rate_limited`). Back off and retry. A resend refused because the event was already sent again 5 times in the last hour is `resend_limit_reached`, a resend refused because the account already sent 60 events again in the last hour is `partner_resend_limit_reached`, and a test webhook refused because 30 were already sent in the last hour is `test_webhook_limit_reached`; all are worth retrying once the hour has moved on.
      */
     429: ErrorResponse;
 };
@@ -2931,7 +2931,7 @@ export type PingErrors = {
      */
     404: ErrorResponse;
     /**
-     * Too many requests (`rate_limited`). Back off and retry. A resend refused because the event was already sent again 5 times in the last hour is `resend_limit_reached`, and a test webhook refused because 30 were already sent in the last hour is `test_webhook_limit_reached`; both are worth retrying once the hour has moved on.
+     * Too many requests (`rate_limited`). Back off and retry. A resend refused because the event was already sent again 5 times in the last hour is `resend_limit_reached`, a resend refused because the account already sent 60 events again in the last hour is `partner_resend_limit_reached`, and a test webhook refused because 30 were already sent in the last hour is `test_webhook_limit_reached`; all are worth retrying once the hour has moved on.
      */
     429: ErrorResponse;
     /**
@@ -3605,7 +3605,7 @@ export type SendTestWebhookErrors = {
      */
     422: ErrorResponse;
     /**
-     * Too many requests (`rate_limited`). Back off and retry. A resend refused because the event was already sent again 5 times in the last hour is `resend_limit_reached`, and a test webhook refused because 30 were already sent in the last hour is `test_webhook_limit_reached`; both are worth retrying once the hour has moved on.
+     * Too many requests (`rate_limited`). Back off and retry. A resend refused because the event was already sent again 5 times in the last hour is `resend_limit_reached`, a resend refused because the account already sent 60 events again in the last hour is `partner_resend_limit_reached`, and a test webhook refused because 30 were already sent in the last hour is `test_webhook_limit_reached`; all are worth retrying once the hour has moved on.
      */
     429: ErrorResponse;
 };

@@ -578,9 +578,13 @@ export const listEvents = <ThrowOnError extends boolean = false>(options?: Optio
  * was first sent to.
  * - **Once.** There is no retry behind a resend; if your endpoint fails you
  * see one failed attempt.
- * - **Five times an hour per event.** The sixth is `429 resend_limit_reached`,
- * retryable once the hour has moved on. `Retry-After` says how many
- * seconds until you can send again.
+ * - **Five times an hour per event, and sixty an hour for your whole
+ * account.** The sixth resend of one event is `429 resend_limit_reached`.
+ * Your sixty-first resend of any event, in the same mode (a live key and
+ * a test key count apart, and the API and the dashboard count together),
+ * is `429 partner_resend_limit_reached`. Both are retryable once the hour
+ * has moved on, and `Retry-After` says how many seconds until you can
+ * send again.
  * - **Never a courier position.** `delivery.courier_location` events are
  * superseded within seconds and are refused with `409 event_not_resendable`.
  * - **Needs an endpoint.** With no webhook URL configured for the key's
