@@ -288,7 +288,7 @@ export type Delivery = {
     /**
      * The goods value you sent, untouched.
      */
-    order_value_cents: number | null;
+    order_value_cents: number;
     /**
      * The total delivery fee.
      */
@@ -2385,8 +2385,17 @@ export type ListDeliveriesData = {
     body?: never;
     path?: never;
     query?: {
+        /**
+         * Only deliveries created at or after this instant (ISO-8601). A value that does not parse is `422 validation_failed` with `param: "created_after"`.
+         */
         created_after?: string;
+        /**
+         * Only deliveries created at or before this instant (ISO-8601). A value that does not parse is `422 validation_failed` with `param: "created_before"`.
+         */
         created_before?: string;
+        /**
+         * The `cursor` of the previous page, to read the next one. Opaque: never build or parse one. A value that does not parse is `422 validation_failed` with `param: "cursor"`.
+         */
         cursor?: string;
         external_id?: string;
         origin?: string;
@@ -2704,12 +2713,21 @@ export type ListEventsData = {
          */
         created_before?: string;
         /**
-         * The `cursor` of the previous page, to read the next one. Opaque: never build or parse one.
+         * The `cursor` of the previous page, to read the next one. Opaque: never build or parse one. A value that does not parse is `422 validation_failed` with `param: "cursor"`.
          */
         cursor?: string;
     };
     url: '/v1/events';
 };
+
+export type ListEventsErrors = {
+    /**
+     * The request was understood and refused. `error.code` says why and `error.param` names the offending field when one applies.
+     */
+    422: ErrorResponse;
+};
+
+export type ListEventsError = ListEventsErrors[keyof ListEventsErrors];
 
 export type ListEventsResponses = {
     /**
@@ -2787,6 +2805,9 @@ export type ListLedgerEntriesData = {
     body?: never;
     path?: never;
     query?: {
+        /**
+         * The `cursor` of the previous page, to read the next one. Opaque: never build or parse one. A value that does not parse is `422 validation_failed` with `param: "cursor"`.
+         */
         cursor?: string;
         delivery_id?: string;
         type?: string;
@@ -2803,6 +2824,10 @@ export type ListLedgerEntriesErrors = {
      * No object with that id exists for this key (`not_found`). Another account's objects are indistinguishable from ones that never existed.
      */
     404: ErrorResponse;
+    /**
+     * The request was understood and refused. `error.code` says why and `error.param` names the offending field when one applies.
+     */
+    422: ErrorResponse;
 };
 
 export type ListLedgerEntriesError = ListLedgerEntriesErrors[keyof ListLedgerEntriesErrors];
@@ -2923,12 +2948,21 @@ export type ListRequestLogsData = {
          */
         created_before?: string;
         /**
-         * The `cursor` of the previous page, to read the next one. Opaque: never build or parse one.
+         * The `cursor` of the previous page, to read the next one. Opaque: never build or parse one. A value that does not parse is `422 validation_failed` with `param: "cursor"`.
          */
         cursor?: string;
     };
     url: '/v1/request_logs';
 };
+
+export type ListRequestLogsErrors = {
+    /**
+     * The request was understood and refused. `error.code` says why and `error.param` names the offending field when one applies.
+     */
+    422: ErrorResponse;
+};
+
+export type ListRequestLogsError = ListRequestLogsErrors[keyof ListRequestLogsErrors];
 
 export type ListRequestLogsResponses = {
     /**
@@ -2964,6 +2998,9 @@ export type ListStoresData = {
     body?: never;
     path?: never;
     query?: {
+        /**
+         * The `cursor` of the previous page, to read the next one. Opaque: never build or parse one. A value that does not parse is `422 validation_failed` with `param: "cursor"`.
+         */
         cursor?: string;
         external_id?: string;
     };
@@ -2975,6 +3012,10 @@ export type ListStoresErrors = {
      * The API key is missing, revoked, or not valid for this mode (`invalid_api_key`).
      */
     401: ErrorResponse;
+    /**
+     * The request was understood and refused. `error.code` says why and `error.param` names the offending field when one applies.
+     */
+    422: ErrorResponse;
 };
 
 export type ListStoresError = ListStoresErrors[keyof ListStoresErrors];
@@ -3130,6 +3171,9 @@ export type ListStoreLedgerEntriesData = {
         store_id: string;
     };
     query?: {
+        /**
+         * The `cursor` of the previous page, to read the next one. Opaque: never build or parse one. A value that does not parse is `422 validation_failed` with `param: "cursor"`.
+         */
         cursor?: string;
         delivery_id?: string;
         type?: string;
@@ -3146,6 +3190,10 @@ export type ListStoreLedgerEntriesErrors = {
      * No object with that id exists for this key (`not_found`). Another account's objects are indistinguishable from ones that never existed.
      */
     404: ErrorResponse;
+    /**
+     * The request was understood and refused. `error.code` says why and `error.param` names the offending field when one applies.
+     */
+    422: ErrorResponse;
 };
 
 export type ListStoreLedgerEntriesError = ListStoreLedgerEntriesErrors[keyof ListStoreLedgerEntriesErrors];
@@ -3521,12 +3569,21 @@ export type ListWebhookDeliveriesData = {
          */
         created_before?: string;
         /**
-         * The `cursor` of the previous page, to read the next one. Opaque: never build or parse one.
+         * The `cursor` of the previous page, to read the next one. Opaque: never build or parse one. A value that does not parse is `422 validation_failed` with `param: "cursor"`.
          */
         cursor?: string;
     };
     url: '/v1/webhook_deliveries';
 };
+
+export type ListWebhookDeliveriesErrors = {
+    /**
+     * The request was understood and refused. `error.code` says why and `error.param` names the offending field when one applies.
+     */
+    422: ErrorResponse;
+};
+
+export type ListWebhookDeliveriesError = ListWebhookDeliveriesErrors[keyof ListWebhookDeliveriesErrors];
 
 export type ListWebhookDeliveriesResponses = {
     /**
@@ -3541,6 +3598,9 @@ export type ListWithdrawalsData = {
     body?: never;
     path?: never;
     query?: {
+        /**
+         * The `cursor` of the previous page, to read the next one. Opaque: never build or parse one. A value that does not parse is `422 validation_failed` with `param: "cursor"`.
+         */
         cursor?: string;
     };
     url: '/v1/withdrawals';
@@ -3551,6 +3611,10 @@ export type ListWithdrawalsErrors = {
      * The API key is missing, revoked, or not valid for this mode (`invalid_api_key`).
      */
     401: ErrorResponse;
+    /**
+     * The request was understood and refused. `error.code` says why and `error.param` names the offending field when one applies.
+     */
+    422: ErrorResponse;
 };
 
 export type ListWithdrawalsError = ListWithdrawalsErrors[keyof ListWithdrawalsErrors];
