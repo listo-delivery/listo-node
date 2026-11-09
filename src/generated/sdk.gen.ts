@@ -1060,11 +1060,23 @@ export const getStore = <ThrowOnError extends boolean = false>(options: Options<
  * add-on off keeps it
  * running until the end of the month already paid. A card payment the bank
  * has not answered yet answers `409 charge_in_flight`; repeat the request
- * shortly. `wallet` and `full_console` cannot be switched on: they read
- * `available: false`, and asking to switch either on is refused with `422
- * validation_failed` and `param: "add_ons.wallet"` or
- * `"add_ons.full_console"`, before anything is changed or charged.
- * Switching them off is accepted. See
+ * shortly. `wallet` (Restaurant balance) and `full_console` (Full console)
+ * are monthly like `ratings`, are for live stores, and move the store's
+ * `access_tier` in the same act: `wallet` for Restaurant balance, `full`
+ * for Full console, and back to `api_only` when the paid month ends,
+ * unless another add-on starts the next day: a Restaurant balance paid
+ * while Full console is running out starts the day after Full console's
+ * last day, and the store goes from `full` to `wallet` that day. Switching
+ * Restaurant balance on while Full console is on is refused with
+ * `422 validation_failed` and `param: "add_ons.wallet"`, because Full
+ * console includes it. On a test store they read `available: false`, and
+ * asking to switch either on is refused with `422 validation_failed` and
+ * `param: "add_ons.wallet"` or `"add_ons.full_console"`, before anything
+ * is changed or charged. A request that switches on more than one add-on
+ * that would charge is refused with `422 validation_failed` and
+ * `param: "add_ons.<key>"`, before anything is changed or charged: send
+ * them in separate requests. On a store of this kind `access_tier` is not
+ * set directly. See
  * [Store add-ons](https://docs.listo.delivery/en/guides/store-add-ons).
  *
  */
@@ -1118,9 +1130,11 @@ export const listStoreLedgerEntries = <ThrowOnError extends boolean = false>(opt
  * Three refusals:
  *
  * - `422 console_access_required` on a store whose `access_tier` is
- * `api_only`. That store has no console to sign in to, so there is
- * nothing to invite anybody to. Set the tier first, then call this
- * again.
+ * `api_only` and that holds no balance to withdraw. That store has no
+ * console to sign in to, so there is nothing to invite anybody to. Give
+ * the store a tier first (on a store of an account that buys add-ons,
+ * switch on its Restaurant balance or Full console add-on), then call
+ * this again.
  * - `422 validation_failed` with `param: "email"` when the store already
  * has an owner at a different address. The `message` names that owner.
  * A store has one owner, and this endpoint cannot change who it is. To

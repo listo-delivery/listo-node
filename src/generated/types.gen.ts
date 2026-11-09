@@ -950,9 +950,16 @@ export type Store = {
      * How much of Listo the store itself uses. An `api_only` store's
      * deliveries spend your balance, and a `wallet` or `full` store's
      * spend its own; `billing` says which. Writable on create and update
-     * (on a store your account creates, `wallet` and `full` are not chosen
-     * here),
-     * and always `api_only` on a test store. A live store of an account
+     * on a store of an account that does not buy add-ons. On a store your
+     * account creates with add-ons, the tier follows the Restaurant balance
+     * and Full console add-ons (`wallet` and `full` come only from
+     * switching one on, and `api_only` only from the add-on ending), so a
+     * create that asks for `wallet` or `full` is refused, and so is an
+     * update that asks for a tier other than the one the store holds (an
+     * update sending `api_only` to a store that holds `wallet` or `full`
+     * included), with `422 validation_failed` and
+     * `param: "access_tier"`; sending back the tier it holds is accepted.
+     * Always `api_only` on a test store. A live store of an account
      * whose restaurants pay their own Plan Listo cannot be `api_only`: it
      * has no console to buy a plan from, so a create or an update that
      * asks for it is refused with `422 validation_failed` and
@@ -1098,7 +1105,8 @@ export type Store = {
      * can hold add-ons; any other store shows `add_ons: null`.
      * When it is an object it has all five keys, each with every field.
      * Switch them on and off with `PATCH /v1/stores/{id}`. `wallet` and
-     * `full_console` read `available: false` and cannot be switched on. See
+     * `full_console` change the store's `access_tier` and are for live
+     * stores: on a test store they read `available: false`. See
      * [Store add-ons](https://docs.listo.delivery/en/guides/store-add-ons).
      *
      */
@@ -1153,11 +1161,13 @@ export type StoreAddOn = {
      * `off` is not switched on. `on` is switched on. `ending` is a monthly
      * add-on you switched off that keeps running until `ends_on`, the end
      * of the month already paid (`ends_on` is null only while a payment
-     * for the next month is still being confirmed). `scheduled` is a monthly add-on that
-     * starts when a month already running ends (`wallet` switched on
-     * while `full_console` is running out). `past_due` is `full_console`
-     * only: its renewal was refused and it is being retried, and the store
-     * is still served meanwhile.
+     * for the next month is still being confirmed). `scheduled` is
+     * `wallet` only: it was switched on and paid while `full_console` is
+     * running out, and it starts the day after `full_console`'s last day.
+     * `past_due` is `full_console` only: its renewal was refused and it is
+     * being retried, and the store is still served meanwhile. The
+     * pay-per-use add-ons (`customer_whatsapp`, `card_payments`) read only
+     * `off` or `on`, and `ending` appears only on the monthly ones.
      *
      */
     status: 'off' | 'on' | 'ending' | 'scheduled' | 'past_due';
@@ -1188,7 +1198,11 @@ export type StoreAddOn = {
      */
     renews_on: string | null;
     /**
-     * The last day an `ending` add-on runs. Null in every other status.
+     * The last day an `ending` add-on is on. Null in every other status.
+     * It means the same for every monthly add-on, `full_console`
+     * included: the add-on is on through this day and off from the next.
+     * A `wallet` scheduled behind an ending `full_console` starts the
+     * next day, and the store's `access_tier` changes that day.
      * For an `ending` add-on it is null ONLY while a payment is still
      * being confirmed: its month was due to renew when you switched it
      * off, a payment for the next month was started, and the end date is
@@ -1202,9 +1216,10 @@ export type StoreAddOn = {
     ends_on: string | null;
     /**
      * Whether this add-on can be switched on for the store. `false` for
-     * `wallet` and `full_console` on every store: they cannot be switched
-     * on, and asking to is refused with `422 validation_failed`. `true`
-     * for the other three.
+     * `wallet` and `full_console` on a test store, which cannot hold them:
+     * asking to switch either on there is refused with
+     * `422 validation_failed`. `true` for the other three on every store
+     * that holds add-ons, and for those two on a live store.
      *
      */
     available: boolean;
@@ -2003,9 +2018,10 @@ export type CreateStoreRequest = {
     default_business_fee_share?: number;
     /**
      * What the store gets besides the API. On a store your account
-     * creates, `wallet` and `full` are not chosen here, so a create that
-     * asks for either tier is refused with `422 validation_failed` and
-     * `param: "access_tier"`. `api_only` is always accepted.
+     * creates with add-ons, `wallet` and `full` come only from the
+     * Restaurant balance and Full console add-ons, so a create that asks
+     * for either tier is refused with `422 validation_failed` and
+     * `param: "access_tier"`. `api_only` is accepted.
      *
      */
     access_tier?: 'api_only' | 'wallet' | 'full';
@@ -2056,9 +2072,10 @@ export type UpdateStoreRequest = {
     default_business_fee_share?: number;
     /**
      * What the store gets besides the API. On a store your account
-     * created, `wallet` and `full` are not chosen here, so a request that
-     * asks for either tier is refused with `422 validation_failed` and
-     * `param: "access_tier"`. `api_only` is always accepted.
+     * created with add-ons, the tier follows the Restaurant balance and
+     * Full console add-ons, so a request that asks for a tier the store
+     * does not hold is refused with `422 validation_failed` and
+     * `param: "access_tier"`. Sending back the tier it holds is accepted.
      *
      */
     access_tier?: 'api_only' | 'wallet' | 'full';
@@ -2070,10 +2087,13 @@ export type UpdateStoreRequest = {
     /**
      * Add-ons to switch on (`true`) or off (`false`). Send only the ones
      * you are changing: a key you leave out is untouched, and this never
-     * replaces the set. `wallet` and `full_console` cannot be switched
-     * on: `true` for either is refused with `422 validation_failed` and
-     * `param: "add_ons.wallet"` or `"add_ons.full_console"`, and `false`
-     * is accepted. Each value must be a JSON boolean; the string
+     * replaces the set. `wallet` and `full_console` are for live stores:
+     * on a test store `true` for either is refused with
+     * `422 validation_failed` and `param: "add_ons.wallet"` or
+     * `"add_ons.full_console"`, and `false` is accepted. A request that
+     * switches on more than one add-on that would charge is refused with
+     * `422 validation_failed` and `param: "add_ons.<key>"`; send them in
+     * separate requests. Each value must be a JSON boolean; the string
      * `"true"`, `1` and `null` are refused with `422 validation_failed`
      * and `param: "add_ons.<key>"`, and so is a key that is not an add-on.
      *
