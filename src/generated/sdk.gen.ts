@@ -1316,7 +1316,10 @@ export const getCardStatus = <ThrowOnError extends boolean = false>(options?: Op
  *
  * A `type` that is not a published event type is `422 validation_failed`
  * with `param: "type"`. With no webhook URL configured for the key's mode
- * the answer is `409 webhook_endpoint_not_configured`.
+ * the answer is `409 webhook_endpoint_not_configured`, unless you send
+ * `deliver: false`: then the event is recorded and listed on
+ * `GET /v1/events` and nothing is sent to a URL, so it needs none. It still
+ * counts toward the thirty an hour.
  *
  */
 export const sendTestWebhook = <ThrowOnError extends boolean = false>(options: Options<SendTestWebhookData, ThrowOnError>): RequestResult<SendTestWebhookResponses, SendTestWebhookErrors, ThrowOnError> => (options.client ?? client).post<SendTestWebhookResponses, SendTestWebhookErrors, ThrowOnError>({

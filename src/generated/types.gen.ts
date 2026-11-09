@@ -2165,6 +2165,17 @@ export type SendTestWebhookRequest = {
      * The published event type to send a sample of.
      */
     type: 'delivery.status_changed' | 'delivery.updated' | 'delivery.courier_location' | 'withdrawal.updated' | 'store.updated' | 'store.connected' | 'delivery.message_skipped' | 'delivery.rated';
+    /**
+     * Whether the event is also sent to your webhook URL. `true`, the
+     * default, sends it. `false` records the event and sends nothing to
+     * the URL, so no webhook URL has to be configured: the event reaches
+     * any session listening for your events live and is listed on
+     * `GET /v1/events` with `test: true`, and no attempt is made. A value
+     * that is not `true` or `false` is refused with `422 validation_failed`
+     * and `param: "deliver"`.
+     *
+     */
+    deliver?: boolean;
 };
 
 /**
