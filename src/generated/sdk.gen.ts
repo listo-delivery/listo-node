@@ -352,6 +352,15 @@ export const listDeliveries = <ThrowOnError extends boolean = false>(options?: O
  * full and nothing else charged; replaying the request answers the same
  * `422`. Send that order to another address under a new `external_id`.
  *
+ * A dropoff the courier network does not serve at all, whatever its
+ * distance from the store, is refused with the same final `422
+ * out_of_service_area` whenever the create prices the trip. That includes
+ * a create that binds a quote but has to price it again (a cash order,
+ * or a quote whose courier price can no longer be booked as it stands).
+ * Only a create that books the bound quote's courier price as it stands
+ * meets that refusal at dispatch, after the delivery was recorded, and
+ * it answers `201` with the delivery ended at `no_courier`.
+ *
  */
 export const createDelivery = <ThrowOnError extends boolean = false>(options: Options<CreateDeliveryData, ThrowOnError>): RequestResult<CreateDeliveryResponses, CreateDeliveryErrors, ThrowOnError> => (options.client ?? client).post<CreateDeliveryResponses, CreateDeliveryErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -787,6 +796,11 @@ export const ping = <ThrowOnError extends boolean = false>(options?: Options<Pin
  * `provider_unavailable`, and no retry of the same store can succeed. You
  * will only meet it on a store you positioned yourself, with `lat`/`lng`,
  * since a store we located is refused when you create it.
+ *
+ * A dropoff beyond the store's 15 km service area, or one the courier
+ * network does not serve at all, whatever its distance from the store, is
+ * refused with `422 out_of_service_area`, which is final: send the order
+ * to another address.
  *
  * A store whose pickup point we cannot currently vouch for is refused
  * with `409 pickup_point_pending`, because until it is confirmed a courier
