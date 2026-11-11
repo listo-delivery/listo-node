@@ -1256,11 +1256,17 @@ export type Withdrawal = {
      */
     kind: 'standard' | 'same_day';
     /**
-     * `pending` until a human settles it. The move to `paid` or `failed`
-     * is what `withdrawal.updated` announces.
+     * `pending` until a human settles it. The move to `paid`, `failed` or
+     * `canceled` is what `withdrawal.updated` announces.
+     *
+     * `canceled` means nothing reached your bank: the request was stopped
+     * before any transfer was sent, and the amount and any same-day fee
+     * are back in `available_cents`. It happens only when your account
+     * asked Listo to cancel the withdrawal. A client that switches on
+     * `status` must handle it.
      *
      */
-    status: 'pending' | 'paid' | 'failed';
+    status: 'pending' | 'paid' | 'failed' | 'canceled';
     requested_at: string | null;
     /**
      * When a `same_day` withdrawal is due to have been sent, stamped when
@@ -1271,7 +1277,9 @@ export type Withdrawal = {
      */
     due_at: string | null;
     /**
-     * Null while still pending.
+     * Null while still pending. Set when the withdrawal was paid, failed
+     * or canceled, to the moment that happened.
+     *
      */
     resolved_at: string | null;
     /**
@@ -1281,7 +1289,8 @@ export type Withdrawal = {
      * dashboard for this withdrawal.
      *
      * Always present, null until the transfer is sent. It stays null
-     * forever on a `failed` withdrawal, because no transfer happened.
+     * forever on a `failed` or `canceled` withdrawal, because no transfer
+     * happened.
      *
      */
     clave_de_rastreo: string | null;
