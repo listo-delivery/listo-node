@@ -1011,6 +1011,11 @@ export const listStores = <ThrowOnError extends boolean = false>(options?: Optio
  * `null`) and the restaurant buys its own Plan Listo in its Listo console.
  * Its deliveries are refused with `402 plan_required` until it does.
  *
+ * If your account is on Listo's self-serve pricing, the store you create
+ * carries no Plan Listo: it is created with no plan (`plan` is `null`),
+ * nothing is charged for a plan, and its deliveries are not refused for
+ * lack of one. You pay for each trip and for the add-ons you switch on.
+ *
  * A test store has no plan.
  *
  */

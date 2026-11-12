@@ -992,9 +992,10 @@ export type Store = {
      * store pays its own plan (every store of an account whose stores pay
      * their own Plan Listo) and the restaurant has not bought one yet: the
      * restaurant buys it in its own console, and there is nothing for you
-     * to pay or to reactivate. It is also `null` for a store of a partner
-     * on pricing with no Plan Listo, which needs no plan. When it is an
-     * object every
+     * to pay or to reactivate. It is also `null` for a store your account
+     * created itself on Listo's self-serve pricing, which needs no plan (a
+     * restaurant that connected to such an account keeps its own plan).
+     * When it is an object every
      * key is present, and the ones that do not apply are `null`. See
      * [Plan and billing](https://docs.listo.delivery/en/guides/plan-and-billing).
      *
