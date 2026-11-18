@@ -1006,13 +1006,21 @@ export type Store = {
          * plan that is passing to the restaurant, see `pending_paid_by`). `past_due`
          * has an unpaid month, and its deliveries are refused with `402
          * plan_required` until the charge goes through. `awaiting_payment`
-         * is a store whose first month your balance and card could not
-         * cover: it holds no plan yet, `price_cents` is the price it
+         * is a store whose first month has not been paid, because your
+         * balance and card could not cover it or because Listo granted
+         * your account live trial deliveries and the first charge of a
+         * store that has never had a paid plan waits until they are
+         * used: it holds no plan yet, `price_cents` is the price it
          * will be charged before IVA (the amount needed to pay is that
          * plus IVA), every date is null, its deliveries are refused with
          * `402 plan_required`, and Listo charges it by itself as soon as
-         * your balance or card covers it. `canceling` was
-         * canceled and is served up to the day before `ends_on`.
+         * your balance or card covers it, unless Listo granted your
+         * account live trial deliveries and the store has never had a
+         * paid plan, in which case the store requests couriers until
+         * they are used, and is then charged as any first month. A store
+         * whose plan ended and is restarted is not covered by the trial:
+         * it is charged, or waits for funds, as always. `canceling` was canceled and is served up to the day
+         * before `ends_on`.
          * `canceled` has ended, and can be restarted.
          *
          */

@@ -314,7 +314,11 @@ export const listDeliveries = <ThrowOnError extends boolean = false>(options?: O
  * refusal.
  *
  * A live store whose Plan Listo is not paid up is refused with `402
- * plan_required`, and nothing is dispatched or debited. It is a different
+ * plan_required` (unless Listo granted your account live trial
+ * deliveries and the store has never had a paid plan and is still waiting
+ * for its first charge, in which case it requests couriers until they
+ * are used), and nothing is
+ * dispatched or debited. It is a different
  * refusal from `402 insufficient_balance`, which is about your balance:
  * read `error.code`, never the status alone. `error.message` names the
  * reason (no active plan, a charge that is pending, a plan that ended on a
@@ -429,7 +433,11 @@ export const refundDelivery = <ThrowOnError extends boolean = false>(options: Op
  *
  * A retry is a new dispatch, so it asks the store's Plan Listo again: a
  * live store whose plan is not paid up is refused with `402
- * plan_required`, exactly as the create is.
+ * plan_required` (unless Listo granted your account live trial
+ * deliveries and the store has never had a paid plan and is still waiting
+ * for its first charge, in which case it requests couriers until they
+ * are used), exactly as the
+ * create is.
  *
  * A retry the courier network refuses for its distance, at the very edge
  * of the store's 15 km service area, answers `422 out_of_service_area`,
@@ -828,8 +836,11 @@ export const ping = <ThrowOnError extends boolean = false>(options?: Options<Pin
  * courier carries in `failure_reason`.
  *
  * A live store whose Plan Listo is not paid up is refused with `402
- * plan_required`, because the create would refuse the delivery this
- * quote prices. `error.message` names the reason: no active plan, a
+ * plan_required` (unless Listo granted your account live trial
+ * deliveries and the store has never had a paid plan and is still waiting
+ * for its first charge, in which case it requests couriers until they
+ * are used), because the
+ * create would refuse the delivery this quote prices. `error.message` names the reason: no active plan, a
  * charge that is pending, a plan that ended on a given date, a plan whose
  * included deliveries for the cycle are all used, or a store that cannot
  * request couriers right now. It is not `retryable`: the identical call
@@ -995,16 +1006,25 @@ export const listStores = <ThrowOnError extends boolean = false>(options?: Optio
  * pays it on your account (see
  * [Plan and billing](https://docs.listo.delivery/en/guides/plan-and-billing)).
  *
- * If you pay your stores' plans, the store starts its Plan Listo and its
- * first month is charged to you in this same request, from your live
- * balance or from the card saved on your account. Fund one of them first,
- * and send an `Idempotency-Key` on every live create: a create that timed
- * out and is repeated without one makes a second store, and the second
- * store starts a second plan. A store whose first charge fails is still
- * created and still answers `201`, with `plan.status` `awaiting_payment`:
- * it has no plan yet, nothing is past due, and its deliveries are refused
- * with `402 plan_required` until your balance or card covers the month,
- * which Listo then charges by itself.
+ * If you pay your stores' plans, the store starts its Plan Listo. Unless
+ * Listo granted your account live trial deliveries and you still have
+ * some left, its first month is charged to you in this same request, from
+ * your live balance or from the card saved on your account. If you do
+ * have some left, the first charge waits until they are used, even when
+ * your balance or card would cover it, and the store requests couriers
+ * in the meantime. Fund your balance or save a card first, and send an
+ * `Idempotency-Key` on every live create: a create that timed out and is
+ * repeated without one makes a second store, and the second store starts
+ * a second plan. A store whose first charge fails, or waits for the
+ * trial, is still created and still answers `201`, with `plan.status`
+ * `awaiting_payment`: it has no plan yet, nothing is past due, and its
+ * deliveries are refused with `402 plan_required` until your balance or
+ * card covers the month, which Listo then charges by itself (unless Listo
+ * granted your account live trial deliveries and the store has never had
+ * a paid plan, which a new store has not, in which case the store
+ * requests couriers until they are used, and is then charged as any
+ * first month: if neither your balance nor your card covers it, the store
+ * waits as before).
  *
  * If your account is set up so that each restaurant pays its own plan,
  * nothing is charged to you: the store is created with no plan (`plan` is
@@ -1192,7 +1212,11 @@ export const createStoreOwner = <ThrowOnError extends boolean = false>(options: 
  * undone with `DELETE /v1/stores/{store_id}/plan_cancellation`, and a
  * `past_due` one starts again when its charge goes through, and a store
  * whose first month is still `awaiting_payment` is charged by itself as
- * soon as your balance or card covers it. It also
+ * soon as your balance or card covers it (unless Listo granted your
+ * account live trial deliveries and the store has never had a paid plan,
+ * in which case the store requests couriers until they are used, and is
+ * then charged as any first month; a store whose plan ended and is
+ * restarted is charged, or waits for funds, as it always has). It also
  * answers when the restaurant pays its own plan, which it buys in its own
  * console and is not yours to reactivate. `409
  * charge_in_progress`, which is `retryable`, while a card charge for the
