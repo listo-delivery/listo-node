@@ -1,7 +1,7 @@
 // Generated from Listo's API definition. Do not edit.
 
-import { cancelDelivery, cancelStorePlan, createCardOnboarding, createConnectRequest, createConnection, createDelivery, createQuote, createStore, createStoreCardOnboarding, createStoreOwner, createWithdrawal, getBalance, getCardStatus, getDelivery, getEvent, getRequestLog, getStore, getStoreBalance, getStoreCardStatus, getWithdrawal, listDeliveries, listEvents, listLedgerEntries, listRequestLogs, listStoreLedgerEntries, listStores, listWebhookDeliveries, listWithdrawals, ping, reactivateStorePlan, refundDelivery, rescheduleDelivery, resendEvent, retryDelivery, sendTestWebhook, undoStorePlanCancellation, updateStore } from "./generated/sdk.gen.ts";
-import type { CancelDeliveryData, CancelDeliveryResponse, CancelStorePlanData, CancelStorePlanResponse, CreateCardOnboardingData, CreateCardOnboardingResponse, CreateConnectRequestData, CreateConnectRequestResponse, CreateConnectionData, CreateConnectionResponse, CreateDeliveryData, CreateDeliveryResponse, CreateQuoteData, CreateQuoteResponse, CreateStoreCardOnboardingData, CreateStoreCardOnboardingResponse, CreateStoreData, CreateStoreOwnerData, CreateStoreOwnerResponse, CreateStoreResponse, CreateWithdrawalData, CreateWithdrawalResponse, GetBalanceData, GetBalanceResponse, GetCardStatusData, GetCardStatusResponse, GetDeliveryData, GetDeliveryResponse, GetEventData, GetEventResponse, GetRequestLogData, GetRequestLogResponse, GetStoreBalanceData, GetStoreBalanceResponse, GetStoreCardStatusData, GetStoreCardStatusResponse, GetStoreData, GetStoreResponse, GetWithdrawalData, GetWithdrawalResponse, ListDeliveriesData, ListDeliveriesResponse, ListEventsData, ListEventsResponse, ListLedgerEntriesData, ListLedgerEntriesResponse, ListRequestLogsData, ListRequestLogsResponse, ListStoreLedgerEntriesData, ListStoreLedgerEntriesResponse, ListStoresData, ListStoresResponse, ListWebhookDeliveriesData, ListWebhookDeliveriesResponse, ListWithdrawalsData, ListWithdrawalsResponse, PingData, PingResponse, ReactivateStorePlanData, ReactivateStorePlanResponse, RefundDeliveryData, RefundDeliveryResponse, RescheduleDeliveryData, RescheduleDeliveryResponse, ResendEventData, ResendEventResponse, RetryDeliveryData, RetryDeliveryResponse, SendTestWebhookData, SendTestWebhookResponse, UndoStorePlanCancellationData, UndoStorePlanCancellationResponse, UpdateStoreData, UpdateStoreResponse } from "./generated/types.gen.ts";
+import { cancelDelivery, cancelStorePlan, createCardOnboarding, createConnectRequest, createConnection, createDelivery, createQuote, createStore, createStoreCardOnboarding, createStoreOwner, createWithdrawal, getBalance, getCardStatus, getDelivery, getEvent, getOrder, getRequestLog, getStore, getStoreBalance, getStoreCardStatus, getWithdrawal, listDeliveries, listEvents, listLedgerEntries, listOrders, listRequestLogs, listStoreLedgerEntries, listStores, listWebhookDeliveries, listWithdrawals, ping, reactivateStorePlan, refundDelivery, rescheduleDelivery, resendEvent, retryDelivery, sendTestWebhook, undoStorePlanCancellation, updateStore } from "./generated/sdk.gen.ts";
+import type { CancelDeliveryData, CancelDeliveryResponse, CancelStorePlanData, CancelStorePlanResponse, CreateCardOnboardingData, CreateCardOnboardingResponse, CreateConnectRequestData, CreateConnectRequestResponse, CreateConnectionData, CreateConnectionResponse, CreateDeliveryData, CreateDeliveryResponse, CreateQuoteData, CreateQuoteResponse, CreateStoreCardOnboardingData, CreateStoreCardOnboardingResponse, CreateStoreData, CreateStoreOwnerData, CreateStoreOwnerResponse, CreateStoreResponse, CreateWithdrawalData, CreateWithdrawalResponse, GetBalanceData, GetBalanceResponse, GetCardStatusData, GetCardStatusResponse, GetDeliveryData, GetDeliveryResponse, GetEventData, GetEventResponse, GetOrderData, GetOrderResponse, GetRequestLogData, GetRequestLogResponse, GetStoreBalanceData, GetStoreBalanceResponse, GetStoreCardStatusData, GetStoreCardStatusResponse, GetStoreData, GetStoreResponse, GetWithdrawalData, GetWithdrawalResponse, ListDeliveriesData, ListDeliveriesResponse, ListEventsData, ListEventsResponse, ListLedgerEntriesData, ListLedgerEntriesResponse, ListOrdersData, ListOrdersResponse, ListRequestLogsData, ListRequestLogsResponse, ListStoreLedgerEntriesData, ListStoreLedgerEntriesResponse, ListStoresData, ListStoresResponse, ListWebhookDeliveriesData, ListWebhookDeliveriesResponse, ListWithdrawalsData, ListWithdrawalsResponse, PingData, PingResponse, ReactivateStorePlanData, ReactivateStorePlanResponse, RefundDeliveryData, RefundDeliveryResponse, RescheduleDeliveryData, RescheduleDeliveryResponse, ResendEventData, ResendEventResponse, RetryDeliveryData, RetryDeliveryResponse, SendTestWebhookData, SendTestWebhookResponse, UndoStorePlanCancellationData, UndoStorePlanCancellationResponse, UpdateStoreData, UpdateStoreResponse } from "./generated/types.gen.ts";
 import type { Operation, PlainRequestOptions, RequestOptions, Transport } from "./transport.ts";
 
 /** Every operation: the Hey API function and whether the schema asks for an Idempotency-Key. */
@@ -21,6 +21,7 @@ export const OPS = {
   getCardStatus: { fn: getCardStatus, idempotent: false, method: "GET", path: "/v1/stripe_status" },
   getDelivery: { fn: getDelivery, idempotent: false, method: "GET", path: "/v1/deliveries/{id}" },
   getEvent: { fn: getEvent, idempotent: false, method: "GET", path: "/v1/events/{id}" },
+  getOrder: { fn: getOrder, idempotent: false, method: "GET", path: "/v1/orders/{id}" },
   getRequestLog: { fn: getRequestLog, idempotent: false, method: "GET", path: "/v1/request_logs/{id}" },
   getStore: { fn: getStore, idempotent: false, method: "GET", path: "/v1/stores/{id}" },
   getStoreBalance: { fn: getStoreBalance, idempotent: false, method: "GET", path: "/v1/stores/{store_id}/balance" },
@@ -29,6 +30,7 @@ export const OPS = {
   listDeliveries: { fn: listDeliveries, idempotent: false, method: "GET", path: "/v1/deliveries" },
   listEvents: { fn: listEvents, idempotent: false, method: "GET", path: "/v1/events" },
   listLedgerEntries: { fn: listLedgerEntries, idempotent: false, method: "GET", path: "/v1/ledger" },
+  listOrders: { fn: listOrders, idempotent: false, method: "GET", path: "/v1/orders" },
   listRequestLogs: { fn: listRequestLogs, idempotent: false, method: "GET", path: "/v1/request_logs" },
   listStoreLedgerEntries: { fn: listStoreLedgerEntries, idempotent: false, method: "GET", path: "/v1/stores/{store_id}/ledger" },
   listStores: { fn: listStores, idempotent: false, method: "GET", path: "/v1/stores" },
@@ -201,6 +203,24 @@ export class LedgerResource {
   }
 }
 
+export class OrdersResource {
+  private readonly t: Transport;
+
+  constructor(t: Transport) {
+    this.t = t;
+  }
+
+  /** List orders (GET /v1/orders) */
+  list(query?: ListOrdersData["query"], options?: PlainRequestOptions): Promise<ListOrdersResponse> {
+    return this.t.call<ListOrdersResponse>(OPS.listOrders, { query }, options);
+  }
+
+  /** Get an order (GET /v1/orders/{id}) */
+  retrieve(id: GetOrderData["path"]["id"], options?: PlainRequestOptions): Promise<GetOrderResponse> {
+    return this.t.call<GetOrderResponse>(OPS.getOrder, { path: { id: id } }, options);
+  }
+}
+
 export class QuotesResource {
   private readonly t: Transport;
 
@@ -330,6 +350,7 @@ export interface ResourceMap {
   deliveries: DeliveriesResource;
   events: EventsResource;
   ledger: LedgerResource;
+  orders: OrdersResource;
   quotes: QuotesResource;
   requestLogs: RequestLogsResource;
   stores: StoresResource;
@@ -346,6 +367,7 @@ export class Resources {
   readonly deliveries: DeliveriesResource;
   readonly events: EventsResource;
   readonly ledger: LedgerResource;
+  readonly orders: OrdersResource;
   readonly quotes: QuotesResource;
   readonly requestLogs: RequestLogsResource;
   readonly stores: StoresResource;
@@ -362,6 +384,7 @@ export class Resources {
     this.deliveries = replacements.deliveries ?? new DeliveriesResource(t);
     this.events = replacements.events ?? new EventsResource(t);
     this.ledger = replacements.ledger ?? new LedgerResource(t);
+    this.orders = replacements.orders ?? new OrdersResource(t);
     this.quotes = replacements.quotes ?? new QuotesResource(t);
     this.requestLogs = replacements.requestLogs ?? new RequestLogsResource(t);
     this.stores = replacements.stores ?? new StoresResource(t);

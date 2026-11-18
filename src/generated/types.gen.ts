@@ -4,11 +4,11 @@ export type ClientOptions = {
     baseUrl: 'https://api.listo.delivery' | (string & {});
 };
 
-export type Webhooks = DeliveryStatusChangedWebhookRequest | DeliveryUpdatedWebhookRequest | DeliveryCourierLocationWebhookRequest | DeliveryMessageSkippedWebhookRequest | DeliveryRatedWebhookRequest | WithdrawalUpdatedWebhookRequest | StoreUpdatedWebhookRequest | PostStoreConnectedWebhookRequest;
+export type Webhooks = DeliveryStatusChangedWebhookRequest | DeliveryUpdatedWebhookRequest | DeliveryCourierLocationWebhookRequest | DeliveryMessageSkippedWebhookRequest | DeliveryRatedWebhookRequest | DeliveryCreatedWebhookRequest | OrderStatusChangedWebhookRequest | WithdrawalUpdatedWebhookRequest | StoreUpdatedWebhookRequest | PostStoreConnectedWebhookRequest;
 
 /**
  * Every event your webhook endpoint receives, and every event the
- * debugging reads return: one of the eight below, told apart by `type`.
+ * debugging reads return: one of the events below, told apart by `type`.
  * `data` is the object the event is about, and its shape depends on
  * `type`. See `WebhookEventEnvelope` for the fields they all share and for
  * how delivery behaves (at-least-once, unordered).
@@ -30,7 +30,11 @@ export type WebhookEvent = ({
     type: 'delivery.message_skipped';
 } & DeliveryMessageSkippedEvent) | ({
     type: 'delivery.rated';
-} & DeliveryRatedEvent);
+} & DeliveryRatedEvent) | ({
+    type: 'delivery.created';
+} & DeliveryCreatedEvent) | ({
+    type: 'order.status_changed';
+} & OrderStatusChangedEvent);
 
 /**
  * The fields every event shares. Delivery is at-least-once and unordered
@@ -119,6 +123,40 @@ export type DeliveryRatedEvent = WebhookEventEnvelope & {
      */
     type: 'delivery.rated';
     data: Delivery;
+};
+
+export type DeliveryCreatedEvent = WebhookEventEnvelope & {
+    /**
+     * Which event this is.
+     */
+    type: 'delivery.created';
+    data: Delivery;
+};
+
+export type OrderStatusChangedEvent = WebhookEventEnvelope & {
+    /**
+     * Which event this is.
+     */
+    type: 'order.status_changed';
+    data: OrderStatusChanged;
+};
+
+/**
+ * The `data` of an `order.status_changed` event: the full order object,
+ * plus the status you were told before this one.
+ *
+ */
+export type OrderStatusChanged = Order & {
+    /**
+     * The last status you were told for this order, which is not
+     * always the status it had a moment ago: when two moves arrive as
+     * one event, this is the status before both. Null on the first
+     * event of an order. It can be `pending_confirmation` when the
+     * new status is `canceled`, because an order can be canceled
+     * before the restaurant answers.
+     *
+     */
+    previous_status: 'pending_confirmation' | 'preparing' | 'ready' | 'completed' | 'rejected' | 'canceled' | null;
 };
 
 /**
@@ -1666,6 +1704,295 @@ export type DeliveryList = {
 };
 
 /**
+ * An order a customer placed with the WhatsApp assistant at one of your
+ * stores. It is what the restaurant reads on its screen and what the
+ * customer was quoted: the lines, the amounts, where it goes and how it
+ * is paid.
+ *
+ * An order appears once the restaurant was asked to confirm it. A card
+ * order the customer has not paid yet has not reached the restaurant, so
+ * it is not listed, and asking for it is `404 not_found`. A key reads only
+ * the orders taken in its own mode (a live store is where customers order,
+ * so live mode is where nearly all of them are), and `test` says which
+ * mode an order was taken in. An order taken before its store joined your
+ * account is not yours and is never shown.
+ *
+ * An order can change without its `status` changing: the restaurant can
+ * add or remove a line, or move the time it promised. Read the order again
+ * before you act on its lines or its total, instead of keeping the copy
+ * you first saw.
+ *
+ * Money is integer centavos, timestamps are ISO-8601 in UTC, and every
+ * enum below is ours. The order carries no numeric id of ours: `id` is the
+ * only handle.
+ *
+ */
+export type Order = {
+    /**
+     * The order id, `ord_` prefixed.
+     */
+    id: string;
+    /**
+     * The `st_` id of the store that takes the order.
+     */
+    store_id: string;
+    /**
+     * The human order code the restaurant and the customer both quote. It
+     * is the same code the order's delivery carries as `code`. Unique per
+     * store, not globally, so never address an order by it: use `id`, or
+     * join to the delivery by `delivery_id`.
+     *
+     */
+    code: string;
+    /**
+     * `pending_confirmation`: the restaurant has been asked and has not
+     * answered yet. `preparing`: it accepted the order and is making it.
+     * `ready`: the food is ready to be handed over. `completed`: it was
+     * handed over, to the courier or to the customer at the counter.
+     * `rejected`: the restaurant did not accept it, and `rejection_reason`
+     * says why. `canceled`: it ended without the restaurant refusing it:
+     * the customer or the restaurant called it off, or Listo did (for
+     * example when no courier could be found). It can happen before the
+     * restaurant answered, so an order can go straight from
+     * `pending_confirmation` to `canceled`.
+     *
+     * `completed`, `rejected` and `canceled` are final. There is no
+     * status for an order that is still waiting for the customer to pay
+     * by card, because such an order is not listed yet.
+     *
+     */
+    status: 'pending_confirmation' | 'preparing' | 'ready' | 'completed' | 'rejected' | 'canceled';
+    /**
+     * True when the order was taken in test mode, and false for a live
+     * one. It is the mode the order was taken in, and it does not change
+     * if the store later changes mode.
+     *
+     */
+    test: boolean;
+    /**
+     * When the customer placed the order.
+     */
+    created_at: string;
+    /**
+     * `delivery`: a courier brings it to the customer, and `dropoff` says
+     * where. `pickup`: the customer collects it at the counter, `dropoff`
+     * is null and `customer_fee_cents` is 0.
+     *
+     */
+    fulfillment: 'delivery' | 'pickup';
+    /**
+     * How the customer pays, and where that got to.
+     */
+    payment: {
+        /**
+         * `cash` is paid at the door or at the counter. `card` is paid
+         * through the payment link Listo sends the customer, before the
+         * restaurant is asked.
+         *
+         */
+        method: 'cash' | 'card';
+        /**
+         * A cash order stays `unpaid`: the money is collected by hand and
+         * is not tracked here. A card order is listed only after the
+         * customer paid, so it starts at `paid`, and goes to `refunded` or
+         * `partially_refunded` if money is given back. You never see
+         * `awaiting_payment` on an order: an order reaches you only once
+         * the restaurant was asked, a card order reaches the restaurant
+         * only after it was paid, and a card order switched to cash goes
+         * to `unpaid`.
+         *
+         */
+        status: 'unpaid' | 'awaiting_payment' | 'paid' | 'partially_refunded' | 'refunded';
+        /**
+         * When the card payment landed. Null on a cash order.
+         */
+        paid_at: string | null;
+    };
+    /**
+     * What was ordered, in the order the customer gave it. Each line is a
+     * snapshot taken when the order was placed (or when the restaurant
+     * amended it), so changing the menu later never changes a placed
+     * order.
+     *
+     */
+    lines: Array<{
+        /**
+         * The dish's name as it was when the order was placed.
+         */
+        name: string;
+        quantity: number;
+        /**
+         * What the customer chose on the dish, one string per question,
+         * with the answers given inside an option in parentheses, as
+         * the restaurant's own ticket prints them (`Tamano: Grande (Pan:
+         * Telera)`). A count above one follows the name (`Extra queso
+         * x2`). Empty when the dish has no options.
+         *
+         */
+        options: Array<string>;
+        /**
+         * What the customer asked for on this line, in their words. Null when they wrote nothing.
+         */
+        note: string | null;
+        /**
+         * The price of ONE unit, with the options included and any sale
+         * already applied. A dish on sale carries its sale price here.
+         *
+         */
+        unit_price_cents: number;
+        /**
+         * What a sale took off ONE unit, already inside
+         * `unit_price_cents`: the unit's regular price is the sum of the
+         * two. 0 when the dish was not on sale.
+         *
+         */
+        sale_discount_cents: number;
+        /**
+         * The whole line, `unit_price_cents` times `quantity`, BEFORE
+         * any campaign offer. `offer_discount_cents` is not subtracted
+         * from it.
+         *
+         */
+        line_total_cents: number;
+        /**
+         * What a campaign offer took off the WHOLE line (not per unit),
+         * not included in `line_total_cents`. 0 when no offer applied.
+         *
+         */
+        offer_discount_cents: number;
+    }>;
+    /**
+     * The sum of the lines' `line_total_cents`, before any campaign offer.
+     */
+    subtotal_cents: number;
+    /**
+     * What a campaign offer took off the food in total: the sum of the
+     * lines' `offer_discount_cents`. 0 when the order used no offer.
+     *
+     */
+    offer_discount_cents: number;
+    /**
+     * The food the customer pays: `subtotal_cents` minus
+     * `offer_discount_cents`.
+     *
+     */
+    food_cents: number;
+    /**
+     * What the customer pays for the delivery, already net of a delivery
+     * offer, so it can be 0 on a delivery order whose offer covered all of
+     * it. 0 on a pickup order.
+     *
+     */
+    customer_fee_cents: number;
+    /**
+     * What the customer pays in all: `food_cents` plus
+     * `customer_fee_cents`.
+     *
+     */
+    total_cents: number;
+    /**
+     * Always `MXN`; every amount is in centavos of it.
+     */
+    currency: 'MXN';
+    /**
+     * Who placed the order.
+     */
+    customer: {
+        name: string;
+        /**
+         * E.164.
+         */
+        phone: string;
+    };
+    /**
+     * Where the order goes, on a delivery order. Null on a pickup order.
+     * The same object a delivery carries as `dropoff`; the name is the
+     * customer's.
+     *
+     */
+    dropoff: {
+        name: string;
+        /**
+         * E.164.
+         */
+        phone: string;
+        street: string;
+        apt_unit: string | null;
+        /**
+         * Null when the address was never located on the map. Never a
+         * fabricated zero.
+         *
+         */
+        lat: number | null;
+        lng: number | null;
+        /**
+         * What the customer wrote for the courier.
+         */
+        notes: string | null;
+        handoff: 'meet_at_door' | 'leave_at_door' | 'meet_outside';
+    } | null;
+    /**
+     * The time the customer asked for the order. Null means as soon as
+     * possible.
+     *
+     */
+    requested_for: string | null;
+    /**
+     * The time the restaurant promised the order ready. Null until it
+     * accepts the order. It moves when the restaurant asks for more time,
+     * so read it again rather than keeping the first one you saw.
+     *
+     */
+    ready_at: string | null;
+    /**
+     * Why the restaurant did not accept the order, on a `rejected` order
+     * and null otherwise. `out_of_stock`: something ran out. `saturated`:
+     * the kitchen has too many orders. `closed`: the restaurant is closed.
+     * `other`: the restaurant wrote its own reason in `rejection_note`.
+     * `unanswered`: nobody at the restaurant answered in time.
+     *
+     */
+    rejection_reason: 'out_of_stock' | 'saturated' | 'closed' | 'other' | 'unanswered' | null;
+    /**
+     * The restaurant's own words, only when `rejection_reason` is
+     * `other`. Null otherwise.
+     *
+     */
+    rejection_note: string | null;
+    /**
+     * The promotions the restaurant was running when the order arrived and
+     * that the order qualifies for, as the owner wrote them (a gift such as
+     * "Refresco de regalo"). They are promised with the order and are not
+     * part of any amount. Empty when there were none.
+     *
+     */
+    promotions: Array<string>;
+    /**
+     * The `dlv_` id of the order's delivery, once the restaurant accepted
+     * a delivery order and a courier was requested for it. Null on a
+     * pickup order and on an order not accepted yet. Read it with
+     * `GET /v1/deliveries/{id}`.
+     *
+     */
+    delivery_id: string | null;
+};
+
+/**
+ * One page of orders, newest first.
+ */
+export type OrderList = {
+    data: Array<Order>;
+    /**
+     * True when a further page exists.
+     */
+    has_more: boolean;
+    /**
+     * Pass as `cursor` to read the next page. Null on the last page.
+     */
+    cursor: string | null;
+};
+
+/**
  * One page of stores, newest first.
  */
 export type StoreList = {
@@ -2182,7 +2509,7 @@ export type SendTestWebhookRequest = {
     /**
      * The published event type to send a sample of.
      */
-    type: 'delivery.status_changed' | 'delivery.updated' | 'delivery.courier_location' | 'withdrawal.updated' | 'store.updated' | 'store.connected' | 'delivery.message_skipped' | 'delivery.rated';
+    type: 'delivery.status_changed' | 'delivery.updated' | 'delivery.courier_location' | 'withdrawal.updated' | 'store.updated' | 'store.connected' | 'delivery.message_skipped' | 'delivery.rated' | 'delivery.created' | 'order.status_changed';
     /**
      * Whether the event is also sent to your webhook URL. `true`, the
      * default, sends it. `false` records the event and sends nothing to
@@ -2348,7 +2675,7 @@ export type WebhookDelivery = {
     /**
      * The type of that event.
      */
-    event_type: 'delivery.status_changed' | 'delivery.updated' | 'delivery.courier_location' | 'withdrawal.updated' | 'store.updated' | 'store.connected' | 'delivery.message_skipped' | 'delivery.rated';
+    event_type: 'delivery.status_changed' | 'delivery.updated' | 'delivery.courier_location' | 'withdrawal.updated' | 'store.updated' | 'store.connected' | 'delivery.message_skipped' | 'delivery.rated' | 'delivery.created' | 'order.status_changed';
     /**
      * Which attempt this is for the event, counted from 1 in the order they
      * were made. A resend continues the count.
@@ -2821,11 +3148,15 @@ export type ListEventsData = {
         /**
          * Only events of one published type, such as `delivery.status_changed`. A value that is not a published type matches nothing. `delivery.courier_location` is left out of an unfiltered list and comes back only when you ask for it here.
          */
-        type?: 'delivery.status_changed' | 'delivery.updated' | 'delivery.courier_location' | 'withdrawal.updated' | 'store.updated' | 'store.connected' | 'delivery.message_skipped' | 'delivery.rated';
+        type?: 'delivery.status_changed' | 'delivery.updated' | 'delivery.courier_location' | 'withdrawal.updated' | 'store.updated' | 'store.connected' | 'delivery.message_skipped' | 'delivery.rated' | 'delivery.created' | 'order.status_changed';
         /**
          * Only the events about one delivery, by its `dlv_` id. An id that is not one of your deliveries in this mode is `404 not_found`.
          */
         delivery_id?: string;
+        /**
+         * Only the events about one order, by its `ord_` id. An id that is not one of your orders in this mode is `404 not_found`.
+         */
+        order_id?: string;
         /**
          * Only events recorded at or after this instant (ISO-8601). A value that does not parse is `422 validation_failed` with `param: "created_after"`.
          */
@@ -2962,6 +3293,86 @@ export type ListLedgerEntriesResponses = {
 };
 
 export type ListLedgerEntriesResponse = ListLedgerEntriesResponses[keyof ListLedgerEntriesResponses];
+
+export type ListOrdersData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Only orders in this status. Any other value, `pending_payment` included, matches nothing: an order still waiting for its card payment is not listed.
+         */
+        status?: 'pending_confirmation' | 'preparing' | 'ready' | 'completed' | 'rejected' | 'canceled';
+        /**
+         * Only this store's orders, by its `st_` id. An id that is not one of your stores in this mode is `404 not_found`.
+         */
+        store_id?: string;
+        /**
+         * Only orders created at or after this instant (ISO-8601). A value that does not parse is `422 validation_failed` with `param: "created_after"`.
+         */
+        created_after?: string;
+        /**
+         * Only orders created at or before this instant (ISO-8601). A value that does not parse is `422 validation_failed` with `param: "created_before"`.
+         */
+        created_before?: string;
+        /**
+         * The `cursor` of the previous page, to read the next one. Opaque: never build or parse one. A value that does not parse is `422 validation_failed` with `param: "cursor"`.
+         */
+        cursor?: string;
+    };
+    url: '/v1/orders';
+};
+
+export type ListOrdersErrors = {
+    /**
+     * No object with that id exists for this key (`not_found`). Another account's objects are indistinguishable from ones that never existed.
+     */
+    404: ErrorResponse;
+    /**
+     * The request was understood and refused. `error.code` says why and `error.param` names the offending field when one applies.
+     */
+    422: ErrorResponse;
+};
+
+export type ListOrdersError = ListOrdersErrors[keyof ListOrdersErrors];
+
+export type ListOrdersResponses = {
+    /**
+     * The request succeeded.
+     */
+    200: OrderList;
+};
+
+export type ListOrdersResponse = ListOrdersResponses[keyof ListOrdersResponses];
+
+export type GetOrderData = {
+    body?: never;
+    path: {
+        /**
+         * The order's `ord_` id. An order that is not yours, was taken in the other mode or has not reached the restaurant yet is `404 not_found`.
+         */
+        id: string;
+    };
+    query?: never;
+    url: '/v1/orders/{id}';
+};
+
+export type GetOrderErrors = {
+    /**
+     * No object with that id exists for this key (`not_found`). Another account's objects are indistinguishable from ones that never existed.
+     */
+    404: ErrorResponse;
+};
+
+export type GetOrderError = GetOrderErrors[keyof GetOrderErrors];
+
+export type GetOrderResponses = {
+    /**
+     * The request succeeded.
+     */
+    200: Order;
+};
+
+export type GetOrderResponse = GetOrderResponses[keyof GetOrderResponses];
 
 export type PingData = {
     body?: never;
@@ -3855,6 +4266,24 @@ export type DeliveryRatedWebhookPayload = DeliveryRatedEvent;
 export type DeliveryRatedWebhookRequest = {
     body: DeliveryRatedWebhookPayload;
     key: 'delivery.rated';
+    path?: never;
+    query?: never;
+};
+
+export type DeliveryCreatedWebhookPayload = DeliveryCreatedEvent;
+
+export type DeliveryCreatedWebhookRequest = {
+    body: DeliveryCreatedWebhookPayload;
+    key: 'delivery.created';
+    path?: never;
+    query?: never;
+};
+
+export type OrderStatusChangedWebhookPayload = OrderStatusChangedEvent;
+
+export type OrderStatusChangedWebhookRequest = {
+    body: OrderStatusChangedWebhookPayload;
+    key: 'order.status_changed';
     path?: never;
     query?: never;
 };

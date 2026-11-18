@@ -2,7 +2,7 @@
 
 import { client } from './client.gen.ts';
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client/index.ts';
-import type { CancelDeliveryData, CancelDeliveryErrors, CancelDeliveryResponses, CancelStorePlanData, CancelStorePlanErrors, CancelStorePlanResponses, CreateCardOnboardingData, CreateCardOnboardingErrors, CreateCardOnboardingResponses, CreateConnectionData, CreateConnectionErrors, CreateConnectionResponses, CreateConnectRequestData, CreateConnectRequestErrors, CreateConnectRequestResponses, CreateDeliveryData, CreateDeliveryErrors, CreateDeliveryResponses, CreateQuoteData, CreateQuoteErrors, CreateQuoteResponses, CreateStoreCardOnboardingData, CreateStoreCardOnboardingErrors, CreateStoreCardOnboardingResponses, CreateStoreData, CreateStoreErrors, CreateStoreOwnerData, CreateStoreOwnerErrors, CreateStoreOwnerResponses, CreateStoreResponses, CreateWithdrawalData, CreateWithdrawalErrors, CreateWithdrawalResponses, GetBalanceData, GetBalanceErrors, GetBalanceResponses, GetCardStatusData, GetCardStatusErrors, GetCardStatusResponses, GetDeliveryData, GetDeliveryErrors, GetDeliveryResponses, GetEventData, GetEventResponses, GetRequestLogData, GetRequestLogResponses, GetStoreBalanceData, GetStoreBalanceErrors, GetStoreBalanceResponses, GetStoreCardStatusData, GetStoreCardStatusErrors, GetStoreCardStatusResponses, GetStoreData, GetStoreErrors, GetStoreResponses, GetWithdrawalData, GetWithdrawalErrors, GetWithdrawalResponses, ListDeliveriesData, ListDeliveriesErrors, ListDeliveriesResponses, ListEventsData, ListEventsErrors, ListEventsResponses, ListLedgerEntriesData, ListLedgerEntriesErrors, ListLedgerEntriesResponses, ListRequestLogsData, ListRequestLogsErrors, ListRequestLogsResponses, ListStoreLedgerEntriesData, ListStoreLedgerEntriesErrors, ListStoreLedgerEntriesResponses, ListStoresData, ListStoresErrors, ListStoresResponses, ListWebhookDeliveriesData, ListWebhookDeliveriesErrors, ListWebhookDeliveriesResponses, ListWithdrawalsData, ListWithdrawalsErrors, ListWithdrawalsResponses, PingData, PingErrors, PingResponses, ReactivateStorePlanData, ReactivateStorePlanErrors, ReactivateStorePlanResponses, RefundDeliveryData, RefundDeliveryErrors, RefundDeliveryResponses, RescheduleDeliveryData, RescheduleDeliveryErrors, RescheduleDeliveryResponses, ResendEventData, ResendEventErrors, ResendEventResponses, RetryDeliveryData, RetryDeliveryErrors, RetryDeliveryResponses, SendTestWebhookData, SendTestWebhookErrors, SendTestWebhookResponses, UndoStorePlanCancellationData, UndoStorePlanCancellationErrors, UndoStorePlanCancellationResponses, UpdateStoreData, UpdateStoreErrors, UpdateStoreResponses } from './types.gen.ts';
+import type { CancelDeliveryData, CancelDeliveryErrors, CancelDeliveryResponses, CancelStorePlanData, CancelStorePlanErrors, CancelStorePlanResponses, CreateCardOnboardingData, CreateCardOnboardingErrors, CreateCardOnboardingResponses, CreateConnectionData, CreateConnectionErrors, CreateConnectionResponses, CreateConnectRequestData, CreateConnectRequestErrors, CreateConnectRequestResponses, CreateDeliveryData, CreateDeliveryErrors, CreateDeliveryResponses, CreateQuoteData, CreateQuoteErrors, CreateQuoteResponses, CreateStoreCardOnboardingData, CreateStoreCardOnboardingErrors, CreateStoreCardOnboardingResponses, CreateStoreData, CreateStoreErrors, CreateStoreOwnerData, CreateStoreOwnerErrors, CreateStoreOwnerResponses, CreateStoreResponses, CreateWithdrawalData, CreateWithdrawalErrors, CreateWithdrawalResponses, GetBalanceData, GetBalanceErrors, GetBalanceResponses, GetCardStatusData, GetCardStatusErrors, GetCardStatusResponses, GetDeliveryData, GetDeliveryErrors, GetDeliveryResponses, GetEventData, GetEventResponses, GetOrderData, GetOrderErrors, GetOrderResponses, GetRequestLogData, GetRequestLogResponses, GetStoreBalanceData, GetStoreBalanceErrors, GetStoreBalanceResponses, GetStoreCardStatusData, GetStoreCardStatusErrors, GetStoreCardStatusResponses, GetStoreData, GetStoreErrors, GetStoreResponses, GetWithdrawalData, GetWithdrawalErrors, GetWithdrawalResponses, ListDeliveriesData, ListDeliveriesErrors, ListDeliveriesResponses, ListEventsData, ListEventsErrors, ListEventsResponses, ListLedgerEntriesData, ListLedgerEntriesErrors, ListLedgerEntriesResponses, ListOrdersData, ListOrdersErrors, ListOrdersResponses, ListRequestLogsData, ListRequestLogsErrors, ListRequestLogsResponses, ListStoreLedgerEntriesData, ListStoreLedgerEntriesErrors, ListStoreLedgerEntriesResponses, ListStoresData, ListStoresErrors, ListStoresResponses, ListWebhookDeliveriesData, ListWebhookDeliveriesErrors, ListWebhookDeliveriesResponses, ListWithdrawalsData, ListWithdrawalsErrors, ListWithdrawalsResponses, PingData, PingErrors, PingResponses, ReactivateStorePlanData, ReactivateStorePlanErrors, ReactivateStorePlanResponses, RefundDeliveryData, RefundDeliveryErrors, RefundDeliveryResponses, RescheduleDeliveryData, RescheduleDeliveryErrors, RescheduleDeliveryResponses, ResendEventData, ResendEventErrors, ResendEventResponses, RetryDeliveryData, RetryDeliveryErrors, RetryDeliveryResponses, SendTestWebhookData, SendTestWebhookErrors, SendTestWebhookResponses, UndoStorePlanCancellationData, UndoStorePlanCancellationErrors, UndoStorePlanCancellationResponses, UpdateStoreData, UpdateStoreErrors, UpdateStoreResponses } from './types.gen.ts';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -563,7 +563,8 @@ export const rescheduleDelivery = <ThrowOnError extends boolean = false>(options
  * carries `test: true`.
  *
  * Filter by `type`, `delivery_id` (the events about one delivery),
- * `created_after` and `created_before`. `delivery.courier_location` is
+ * `order_id` (the events about one order), `created_after` and
+ * `created_before`. `delivery.courier_location` is
  * left out of an unfiltered list: it is emitted about every twenty seconds
  * for every trip on the road and is never sent again, so it would bury
  * everything else. Ask for it with `type=delivery.courier_location`.
@@ -721,6 +722,49 @@ export const getEvent = <ThrowOnError extends boolean = false>(options: Options<
 export const listLedgerEntries = <ThrowOnError extends boolean = false>(options?: Options<ListLedgerEntriesData, ThrowOnError>): RequestResult<ListLedgerEntriesResponses, ListLedgerEntriesErrors, ThrowOnError> => (options?.client ?? client).get<ListLedgerEntriesResponses, ListLedgerEntriesErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v1/ledger',
+    ...options
+});
+
+/**
+ * List orders
+ *
+ * The orders customers placed with the WhatsApp assistant at your stores,
+ * newest first, keyset-paginated the same way deliveries are. Filter by
+ * `status`, `store_id`, `created_after` and `created_before`.
+ *
+ * An order is listed once the restaurant was asked to confirm it. A card
+ * order the customer has not paid yet is not listed, and neither is an
+ * order taken before its store joined your account. A key reads only the
+ * orders taken in its own mode, so a test key does not see live orders.
+ *
+ * An order can change without its `status` changing (the restaurant can
+ * add or remove a line, or move the time it promised), so read it again
+ * with `GET /v1/orders/{id}` before you act on its lines. Its delivery,
+ * when it has one, is `delivery_id`; the same order and delivery also
+ * share a `code`.
+ *
+ */
+export const listOrders = <ThrowOnError extends boolean = false>(options?: Options<ListOrdersData, ThrowOnError>): RequestResult<ListOrdersResponses, ListOrdersErrors, ThrowOnError> => (options?.client ?? client).get<ListOrdersResponses, ListOrdersErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/orders',
+    ...options
+});
+
+/**
+ * Get an order
+ *
+ * Fetches one order by its `ord_` id. An order that is not yours, that
+ * was taken in the other mode, or that the restaurant has not been asked
+ * to confirm yet is `404 not_found`.
+ *
+ * Read it again before you act on it: its lines, its total and the time
+ * the restaurant promised can change while its `status` stays the same.
+ * Its delivery, when it has one, is `delivery_id`.
+ *
+ */
+export const getOrder = <ThrowOnError extends boolean = false>(options: Options<GetOrderData, ThrowOnError>): RequestResult<GetOrderResponses, GetOrderErrors, ThrowOnError> => (options.client ?? client).get<GetOrderResponses, GetOrderErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/orders/{id}',
     ...options
 });
 
