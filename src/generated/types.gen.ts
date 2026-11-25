@@ -360,6 +360,34 @@ export type Delivery = {
      *
      */
     tip_cents: number;
+    /**
+     * The order protection charged on this delivery, in Mexican peso
+     * cents: 2% of `order_value_cents` plus 16% IVA on an order above
+     * $1,000 (a $1,200 order is charged $24.00 plus $3.84 of IVA, which
+     * is `2784`), taken from the balance that pays for your store's
+     * deliveries as its own line and never inside `fee_cents`,
+     * `business_fee_cents` or `customer_fee_cents`. It is the whole
+     * amount that left the balance, IVA included. 0, never null, on an order of $1,000 or less
+     * and on any order booked while the charge was off. It is the figure
+     * charged when the order was created, so it does not change if the
+     * charge is later turned on or off. A create whose balance cannot
+     * cover it together with `business_fee_cents` and `tip_cents` is
+     * refused with `402 insufficient_balance` and nothing is created. If
+     * the order is canceled before the courier picks it up, the charge
+     * goes back to the balance; an order that was picked up and then
+     * returned keeps it.
+     *
+     * Whatever the charge, if a picked-up order is lost Listo pays back
+     * half its `order_value_cents`, on any order whatever its value and
+     * whether or not the charge was on. Only the 2% and the locked codes
+     * are for orders above $1,000.
+     *
+     * An event recorded before this version (a resend delivers the stored
+     * event unchanged) does not carry this field: read an absent
+     * `order_protection_cents` on an event as 0.
+     *
+     */
+    order_protection_cents: number;
     currency: 'MXN';
     /**
      * The `qt_` quote this order bound, so you can tie the price you were
@@ -516,9 +544,10 @@ export type Delivery = {
     tracking_url: string | null;
     /**
      * Present only when the order carries a dropoff PIN: when you asked
-     * for one (`verification.dropoff_pincode` on the create), or when
-     * Listo requires a PIN on every delivery of this store's account, in
-     * which case it is present even though you did not ask. `pincode` is
+     * for one (`verification.dropoff_pincode` on the create), when
+     * Listo requires a PIN on every delivery of this store's account, or
+     * when `order_value_cents` is above $1,000, which always carries one;
+     * in the last two cases it is present even though you did not ask. `pincode` is
      * null until the order is actually dispatched, which is when the code
      * is minted.
      *
@@ -537,7 +566,9 @@ export type Delivery = {
      * arrives in `delivery.status_changed` (the move into `returning`) and
      * in `delivery.updated`, which carry the whole object. A new attempt
      * (a retry) gets its own code. Show it to the store, and never to the
-     * customer.
+     * customer. An order whose `order_value_cents` is above $1,000 always
+     * carries a return code, even when your Partner has the return code
+     * switched off.
      *
      */
     return_verification: {
@@ -2254,7 +2285,10 @@ export type CreateDeliveryRequest = {
      */
     verification?: {
         /**
-         * True to require a code at the door. Defaults to false.
+         * True to require a code at the door. Defaults to false. An order
+         * whose `order_value_cents` is above $1,000 always carries the
+         * code, even when this is false or left out.
+         *
          */
         dropoff_pincode?: boolean;
     };

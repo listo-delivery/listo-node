@@ -668,9 +668,24 @@ export const getEvent = <ThrowOnError extends boolean = false>(options: Options<
  * collected that reached nobody, credited after we claim it. Positive,
  * tied to the order it belongs to, and NOT paired with any debit on this
  * ledger: the order's value never moved through your balance, so there
- * is nothing to net it against. It is decided case by case and is not
- * guaranteed, so never derive it from the order total or expect one per
+ * is nothing to net it against. When a picked-up order is lost and the
+ * report qualifies, the credit is half the order's declared value
+ * (`order_value_cents`), on any order whatever its value; Listo can
+ * also credit another amount as a courtesy. Every report is reviewed
+ * first, so never derive it from the order total or expect one per
  * incident.
+ * - `order_protection` is the order protection charged when an order
+ * above $1,000 is created: 2% of `order_value_cents` plus 16% IVA, as
+ * its own row beside the order's `subsidy` and never inside it.
+ * Negative, tied to the order it belongs to. It exists only while the
+ * charge is on, and it is the whole amount that left the balance.
+ * Read the same figure on the delivery as `order_protection_cents`.
+ * - `order_protection_refund` is that charge coming back, in full, when
+ * the order is canceled before the courier picked it up. Positive, and
+ * posted as its own row against the same `delivery_id`; a retried order
+ * can carry several debit and credit pairs, so net them by
+ * `delivery_id`. An order that was picked up and then lost or returned
+ * keeps the charge, so it has no refund row.
  * - `listo_charge_correction` is a charge Listo made in error and gave
  * back: a `provider_charge` that turned out not to be yours to pay.
  * Positive, tied to the order it corrects, and posted as its own row
