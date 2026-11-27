@@ -271,6 +271,16 @@ export type Delivery = {
      * same object throughout; there is no second delivery for the return
      * leg.
      *
+     * The order is not strictly one way before pickup: when the courier
+     * network takes the courier off a delivery that is `courier_assigned`
+     * or `picking_up`, it goes back to `dispatching` with `courier` null,
+     * and shows as `courier_assigned` again when the next courier is
+     * assigned. Order `delivery.*` events by the delivery's `updated_at`,
+     * and read a status that is earlier in the flow but newer as real.
+     * `updated_at` is in whole seconds, so when two delivery events carry
+     * the same one, read the delivery back with `GET /v1/deliveries/{id}`
+     * instead of choosing between them.
+     *
      * `returning`: the drop-off failed and the courier is bringing the
      * order back to the store; it ends in `returned`. It is NOT terminal,
      * and it is where a failed delivery now spends the minutes between the
@@ -464,8 +474,11 @@ export type Delivery = {
      */
     vehicle: 'moto' | 'car';
     /**
-     * Null until a courier is assigned, and then FROZEN: a terminal
-     * delivery keeps reporting who carried it.
+     * Null until a courier is assigned. It is null again, with `status`
+     * back at `dispatching`, when the courier network takes the courier
+     * off before pickup, until the next courier is assigned. From pickup
+     * on it is FROZEN: a terminal delivery keeps reporting who carried
+     * it.
      *
      */
     courier: {
